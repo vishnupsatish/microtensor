@@ -9,35 +9,23 @@
 #include <memory>
 #include <vector>
 
-#include "operation.h"
+class TensorImpl;
 
-// Not to be used in a polymorphic setting!
-struct Storage : std::vector<float> {
-  using std::vector<float>::vector;
-};
-
+// Lightweight object that is a wrapper around a `TensorImpl`.
 class Tensor {
-  std::shared_ptr<Storage> m_data;
-  std::vector<size_t> m_strides;
-  std::vector<size_t> m_shape;
-  std::shared_ptr<Tensor> m_grad;
-  // Automatically require gradient for now.
-  // const bool requires_grad = false;
-
-  void initialize_grad();
-  void accumulate_grad(std::shared_ptr<Tensor> new_grad);
+  std::shared_ptr<TensorImpl> m_impl;
 
  public:
-  std::unique_ptr<Operation> m_creator;
-
   Tensor(const std::vector<size_t>& shape);
+  Tensor(const Tensor& other);
+  Tensor(std::shared_ptr<TensorImpl> otherImpl);
 
   void fill_random();
   void print(std::ostream& os);
-  std::shared_ptr<Tensor> getGrad() const;
+  Tensor getGrad() const;
+  Tensor operator+(const Tensor& other);
+  Tensor operator*(const Tensor& other);
 
-  std::shared_ptr<Tensor> operator*(const Tensor& other);
-  std::shared_ptr<Tensor> operator+(const Tensor& other);
-
+  // Populating gradients backwards.
   void backward();
 };
