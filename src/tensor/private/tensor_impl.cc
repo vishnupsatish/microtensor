@@ -74,14 +74,13 @@ void TensorImpl::accumulate_grad(std::shared_ptr<TensorImpl> new_grad) {
   if (!m_grad) {
     m_grad = new_grad;
   } else {
-    // Need to be careful here, but I think this is ok.
-    m_grad = add(m_grad, new_grad);
+    // Disable tracking creator.
+    m_grad = add(m_grad, new_grad, false);
   }
 }
 
 void TensorImpl::backward() {
   if (!m_grad) {
-    // set to all 1s, gradient of us wrt us is 1
     initialize_grad();
   }
 
