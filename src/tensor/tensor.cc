@@ -19,6 +19,9 @@ Tensor::Tensor(const Tensor& other) : m_impl{other.m_impl} {}
 
 Tensor::Tensor(std::shared_ptr<TensorImpl> otherImpl) : m_impl{otherImpl} {}
 
+Tensor::Tensor(const Shape& shape, const std::vector<float>& data)
+    : m_impl{std::make_shared<TensorImpl>(shape, data)} {}
+
 void Tensor::fill_random() { m_impl->fill_random(); }
 
 void Tensor::print(std::ostream& os) { m_impl->print(os); }
@@ -36,3 +39,5 @@ Tensor Tensor::operator*(const Tensor& other) {
 }
 
 void Tensor::backward() { m_impl->backward(); }
+
+void Tensor::dump_tensor(std::ostream& os) { m_impl->dump_tensor(os); }

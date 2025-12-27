@@ -60,17 +60,16 @@ class BroadcastOp : public Operation {
 
     auto grad_input = std::make_shared<TensorImpl>(input->m_shape);
     std::fill(grad_input->m_data->begin(), grad_input->m_data->end(), 0.0f);
-    // Do not track creator. TODO: create helper for getting strides of
-    // broadcasted tensor without creating the tensor, since we don't use the
-    // tensor at all here.
-    auto grad_input_view = broadcast(grad_input, grad_output->m_shape, false);
+    auto broadcast_strides =
+        get_broadcast_strides(grad_input, grad_output->m_shape);
 
     size_t total_elements = sizeFromShape(grad_output->m_shape);
     std::vector<size_t> coords(grad_output->m_shape.size(), 0);
 
     for (size_t i = 0; i < total_elements; ++i) {
-      size_t offset_view = get_physical_offset(
-          coords, grad_input_view->m_strides, grad_input_view->m_offset);
+      // I think grad_input->m_offset will always be 0...
+      size_t offset_view =
+          get_physical_offset(coords, broadcast_strides, grad_input->m_offset);
       size_t offset_out = get_physical_offset(coords, grad_output->m_strides,
                                               grad_output->m_offset);
 
@@ -163,32 +162,9 @@ std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target, bool track_creator) {
   // Assumes broadcastable, not intended to be a user-facing function for now.
   // only used for implicit broadcasting.
-  std::vector<size_t> strides(target.size(), 0);
-  auto it_target_dim = target.rbegin();
-  auto it_new_stride = strides.rbegin();
-  auto it_input_dim = a->m_shape.rbegin();
-  auto it_input_stride = a->m_strides.rbegin();
-
-  while (it_target_dim != target.rend()) {
-    size_t current_target_dim = *it_target_dim;
-    if (it_input_dim != a->m_shape.rend()) {
-      size_t current_input_dim = *it_input_dim;
-      size_t current_input_stride = *it_input_stride;
-      if (current_input_dim == current_target_dim) {
-        *it_new_stride = current_input_stride;
-      } else if (current_input_dim == 1) {
-        *it_new_stride = 0;
-      }
-      ++it_input_dim;
-      ++it_input_stride;
-    } else {
-      *it_new_stride = 0;
-    }
-    ++it_target_dim;
-    ++it_new_stride;
-  }
-
+  auto strides = get_broadcast_strides(a, target);
   auto out = std::make_shared<TensorImpl>(target, strides, a->m_data);
+  out->m_offset = a->m_offset;
   if (track_creator) {
     out->m_creator = std::make_unique<BroadcastOp>(std::vector{a}, out);
   }

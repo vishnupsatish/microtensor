@@ -20,11 +20,14 @@ class Tensor {
   Tensor(const Shape& shape);
   Tensor(const Tensor& other);
   Tensor(std::shared_ptr<TensorImpl> otherImpl);
+  Tensor(const Shape& shape, const std::vector<float>& data);
 
   void fill_random();
   void print(std::ostream& os);
   Tensor getGrad() const;
   Shape getShape() const;
+
+  void dump_tensor(std::ostream& os);
 
   Tensor operator+(const Tensor& other);
   Tensor operator*(const Tensor& other);

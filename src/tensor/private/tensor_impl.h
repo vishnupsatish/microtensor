@@ -15,9 +15,11 @@
 class Operation;
 
 // Not to be used in a polymorphic setting!
-struct Storage : std::vector<float> {
-  using std::vector<float>::vector;
-};
+// struct Storage : std::vector<float> {
+//   using std::vector<float>::vector;
+// };
+
+using Storage = std::vector<float>;
 
 struct TensorImpl {
   std::shared_ptr<Storage> m_data;
@@ -38,9 +40,12 @@ struct TensorImpl {
   TensorImpl(const Shape& shape);
   TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
              std::shared_ptr<Storage> data);
+  TensorImpl(const Shape& shape, const std::vector<float>& data);
 
   void fill_random();
   void print(std::ostream& os);
+  void dump_tensor(std::ostream& os);
+
   std::shared_ptr<TensorImpl> getGrad() const;
 
   void backward();
@@ -52,3 +57,6 @@ size_t get_physical_offset(const std::vector<size_t>& coords,
                            size_t offset = 0);
 
 void increment_coords(std::vector<size_t>& coords, const Shape& shape);
+
+std::vector<size_t> get_broadcast_strides(std::shared_ptr<TensorImpl> a,
+                                          const Shape& target);

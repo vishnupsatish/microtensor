@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -41,6 +42,11 @@ TensorImpl::TensorImpl(const Shape& shape)
 TensorImpl::TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
                        std::shared_ptr<Storage> data)
     : m_shape{shape}, m_data{data}, m_strides{strides} {}
+
+TensorImpl::TensorImpl(const Shape& shape, const std::vector<float>& data)
+    : m_shape{shape},
+      m_data{std::make_shared<Storage>(data)},
+      m_strides(defaultStridesFromShape(shape)) {}
 
 std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
@@ -142,6 +148,31 @@ void TensorImpl::print(std::ostream& os) {
   recursive_print(recursive_print, 0);
 }
 
+// Used for differential testing.
+// Format:
+// rank
+// shape[0] shape[1] ... shape[rank-1]
+// data[0] data[1] ... data[total_elements-1]
+void TensorImpl::dump_tensor(std::ostream& os) {
+  os << m_shape.size() << "\n";
+  for (size_t dim : m_shape) {
+    os << dim << " ";
+  }
+  os << "\n";
+
+  size_t total_elements = sizeFromShape(m_shape);
+  std::vector<size_t> coords(m_shape.size(), 0);
+
+  os << std::fixed << std::setprecision(6);  // 6 decimal places
+
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset = get_physical_offset(coords, m_strides, m_offset);
+    os << (*m_data)[offset] << " ";
+    increment_coords(coords, m_shape);
+  }
+  os << "\n";
+}
+
 size_t get_physical_offset(const std::vector<size_t>& coords,
                            const std::vector<size_t>& strides, size_t offset) {
   size_t out = offset;
@@ -152,9 +183,39 @@ size_t get_physical_offset(const std::vector<size_t>& coords,
 }
 
 void increment_coords(std::vector<size_t>& coords, const Shape& shape) {
+  // add an assertion to make sure we are not incrementing past the shape.
   for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
     coords[i]++;
     if (coords[i] < shape[i]) return;
     coords[i] = 0;
   }
+}
+
+std::vector<size_t> get_broadcast_strides(std::shared_ptr<TensorImpl> a,
+                                          const Shape& target) {
+  std::vector<size_t> strides(target.size(), 0);
+  auto it_target_dim = target.rbegin();
+  auto it_new_stride = strides.rbegin();
+  auto it_input_dim = a->m_shape.rbegin();
+  auto it_input_stride = a->m_strides.rbegin();
+
+  while (it_target_dim != target.rend()) {
+    size_t current_target_dim = *it_target_dim;
+    if (it_input_dim != a->m_shape.rend()) {
+      size_t current_input_dim = *it_input_dim;
+      size_t current_input_stride = *it_input_stride;
+      if (current_input_dim == current_target_dim) {
+        *it_new_stride = current_input_stride;
+      } else if (current_input_dim == 1) {
+        *it_new_stride = 0;
+      }
+      ++it_input_dim;
+      ++it_input_stride;
+    } else {
+      *it_new_stride = 0;
+    }
+    ++it_target_dim;
+    ++it_new_stride;
+  }
+  return strides;
 }
