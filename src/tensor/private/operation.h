@@ -10,7 +10,8 @@
 
 #include "tensor_impl.h"
 
-// Stores all the state necessary to perform an operation backwards.
+// Stores all the state necessary to perform an operation backwards (is a
+// function object, in a sense).
 class Operation {
  public:
   virtual ~Operation() = default;
@@ -23,6 +24,7 @@ class Operation {
       std::shared_ptr<TensorImpl> grad_output) = 0;
 
   std::vector<std::shared_ptr<TensorImpl>> m_parents;
+  // Output owns the operation, so this must be non-owning.
   std::weak_ptr<TensorImpl> m_output;
 };
 

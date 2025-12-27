@@ -10,6 +10,8 @@
 #include <memory>
 #include <vector>
 
+#include "shape.h"
+
 class Operation;
 
 // Not to be used in a polymorphic setting!
@@ -20,7 +22,7 @@ struct Storage : std::vector<float> {
 struct TensorImpl {
   std::shared_ptr<Storage> m_data;
   std::vector<size_t> m_strides;
-  std::vector<size_t> m_shape;
+  Shape m_shape;
   std::shared_ptr<TensorImpl> m_grad;
   // Automatically require gradient for now.
   // const bool requires_grad = false;
@@ -31,7 +33,7 @@ struct TensorImpl {
  public:
   std::unique_ptr<Operation> m_creator;
 
-  TensorImpl(const std::vector<size_t>& shape);
+  TensorImpl(const Shape& shape);
 
   void fill_random();
   void print(std::ostream& os);

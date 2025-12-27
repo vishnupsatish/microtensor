@@ -16,23 +16,25 @@
 #include <vector>
 
 #include "operation.h"
+#include "shape.h"
 
-std::vector<size_t> defaultStridesFromShape(const std::vector<size_t>& shape) {
-  size_t ndim = shape.size();
-  std::vector<size_t> strides(ndim, 1);
-  if (ndim == 0) return strides;
-  for (int i = ndim - 2; i >= 0; --i) {
-    strides[i] = strides[i + 1] * shape[i + 1];
+namespace {
+
+void build_topo(Operation* op, std::set<Operation*>& visited,
+                std::vector<Operation*>& topo_order) {
+  if (!op || visited.contains(op)) return;
+  visited.insert(op);
+  for (auto& input : op->m_parents) {
+    if (input->m_creator) {
+      build_topo(input->m_creator.get(), visited, topo_order);
+    }
   }
-  return strides;
+  topo_order.push_back(op);
 }
 
-size_t sizeFromShape(const std::vector<size_t>& shape) {
-  return std::accumulate(shape.begin(), shape.end(), 1,
-                         std::multiplies<size_t>());
-}
+}  // namespace
 
-TensorImpl::TensorImpl(const std::vector<size_t>& shape)
+TensorImpl::TensorImpl(const Shape& shape)
     : m_shape{shape},
       m_data{std::make_shared<Storage>(sizeFromShape(shape))},
       m_strides(defaultStridesFromShape(shape)) {}
@@ -50,18 +52,6 @@ void TensorImpl::fill_random() {
   for (auto& x : *m_data) {
     x = dist(gen);
   }
-}
-
-void build_topo(Operation* op, std::set<Operation*>& visited,
-                std::vector<Operation*>& topo_order) {
-  if (!op || visited.contains(op)) return;
-  visited.insert(op);
-  for (auto& input : op->m_parents) {
-    if (input->m_creator) {
-      build_topo(input->m_creator.get(), visited, topo_order);
-    }
-  }
-  topo_order.push_back(op);
 }
 
 // Initialize to all ones.

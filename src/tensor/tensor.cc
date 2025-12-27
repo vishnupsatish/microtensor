@@ -12,7 +12,7 @@
 #include "private/operation.h"
 #include "private/tensor_impl.h"
 
-Tensor::Tensor(const std::vector<size_t>& shape)
+Tensor::Tensor(const Shape& shape)
     : m_impl{std::make_shared<TensorImpl>(shape)} {}
 
 Tensor::Tensor(const Tensor& other) : m_impl{other.m_impl} {}

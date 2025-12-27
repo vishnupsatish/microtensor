@@ -5,6 +5,8 @@ add_library(Tensor
     private/tensor_impl.h
     private/operation.h
     private/operation.cc
+    private/shape.cc
+    private/shape.h
 )
 
 add_subdirectory(unittest)
