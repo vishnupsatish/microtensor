@@ -9,3 +9,7 @@ Inspired by some of the things I worked on and saw colleagues work on at Huawei.
 3. Python bindings
 4. CPU acceleration
 5. GPU acceleration
+
+Notes:
+
+- Tensors are immutable if the goal is to perform backpropagation

@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <initializer_list>
 #include <memory>
 #include <vector>
 
@@ -23,6 +22,9 @@ class Tensor {
   void fill_random();
   void print(std::ostream& os);
   Tensor getGrad() const;
+
+  // Performs operation and stores state to be able to find gradients
+  // automatically.
   Tensor operator+(const Tensor& other);
   Tensor operator*(const Tensor& other);
 

@@ -23,10 +23,19 @@ int main() {
   c.print(std::cout);
   std::cout << '\n';
 
-  c.backward();
-  a.getGrad().print(std::cout);
+  auto d = c * a;
+  d.print(std::cout);
+  std::cout << '\n';
+
+  d.backward();
+
+  std::cout << "print gradients\n";
+
+  c.getGrad().print(std::cout);
   std::cout << '\n';
   b.getGrad().print(std::cout);
+  std::cout << '\n';
+  a.getGrad().print(std::cout);
   std::cout << '\n';
 
   return 0;
