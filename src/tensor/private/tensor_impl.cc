@@ -5,9 +5,8 @@
 
 #include "tensor_impl.h"
 
-#include <assert.h>
-
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -39,6 +38,10 @@ TensorImpl::TensorImpl(const Shape& shape)
       m_data{std::make_shared<Storage>(sizeFromShape(shape))},
       m_strides(defaultStridesFromShape(shape)) {}
 
+TensorImpl::TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
+                       std::shared_ptr<Storage> data)
+    : m_shape{shape}, m_data{data}, m_strides{strides} {}
+
 std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
 void TensorImpl::fill_random() {
@@ -49,6 +52,9 @@ void TensorImpl::fill_random() {
   std::mt19937 gen(rd());  // seeded each call
   std::uniform_real_distribution<float> dist(mn, mx);
 
+  // TODO: must take into account the offset, and also that the storage could be
+  // shared... not ideal. In general, operations that mutate tensor data is
+  // unclean with this design.
   for (auto& x : *m_data) {
     x = dist(gen);
   }
@@ -99,46 +105,56 @@ void TensorImpl::backward() {
 void TensorImpl::print(std::ostream& os) {
   // Case 0: Scalar (0-D)
   if (m_shape.empty()) {
-    os << (*m_data)[0];
+    os << (*m_data)[m_offset];
     return;
   }
 
-  // Case 1: Vector (1-D)
-  if (m_shape.size() == 1) {
-    os << "[";
-    for (int i = 0; i < m_shape[0]; ++i) {
-      // Calculate index: start + i * stride
-      int idx = 0 + (i * m_strides[0]);
-      os << (*m_data)[idx];
+  std::vector<size_t> coords(m_shape.size(), 0);
 
-      // Comma separation
-      if (i < m_shape[0] - 1) os << ", ";
+  // Recursive helper to handle nested brackets and indentation
+  auto recursive_print = [&](auto& self, size_t dim) -> void {
+    // Base case: we've reached the innermost level, print the value
+    if (dim == m_shape.size()) {
+      os << (*m_data)[get_physical_offset(coords, m_strides, m_offset)];
+      return;
+    }
+
+    os << "[";
+    for (size_t i = 0; i < m_shape[dim]; ++i) {
+      coords[dim] = i;
+      self(self, dim + 1);
+
+      // If there's another element in this dimension, add a comma
+      if (i < m_shape[dim] - 1) {
+        os << ", ";
+
+        // If we are printing anything deeper than a 1D vector,
+        // add a newline and indentation for readability
+        if (m_shape.size() - dim > 1) {
+          os << "\n";
+          for (size_t j = 0; j <= dim; ++j) os << "  ";
+        }
+      }
     }
     os << "]";
-    return;
+  };
+
+  recursive_print(recursive_print, 0);
+}
+
+size_t get_physical_offset(const std::vector<size_t>& coords,
+                           const std::vector<size_t>& strides, size_t offset) {
+  size_t out = offset;
+  for (size_t i = 0; i < coords.size(); ++i) {
+    out += coords[i] * strides[i];
   }
+  return out;
+}
 
-  // Case 2: Matrix (2-D)
-  if (m_shape.size() == 2) {
-    os << "[\n";
-    for (int i = 0; i < m_shape[0]; ++i) {  // Rows
-      os << "  [";
-      for (int j = 0; j < m_shape[1]; ++j) {  // Columns
-        // Calculate index: start + row_offset + col_offset
-        int idx = (i * m_strides[0]) + (j * m_strides[1]);
-        os << (*m_data)[idx];
-
-        if (j < m_shape[1] - 1) os << ", ";
-      }
-      os << "]";
-
-      // Newline between rows, but not after the last one
-      if (i < m_shape[0] - 1) os << ",\n";
-    }
-    os << "\n]";
-    return;
+void increment_coords(std::vector<size_t>& coords, const Shape& shape) {
+  for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+    coords[i]++;
+    if (coords[i] < shape[i]) return;
+    coords[i] = 0;
   }
-
-  os << "[Tensor with " << m_shape.size()
-     << " dimensions (Print not supported yet)]";
 }

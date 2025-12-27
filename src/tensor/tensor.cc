@@ -25,6 +25,8 @@ void Tensor::print(std::ostream& os) { m_impl->print(os); }
 
 Tensor Tensor::getGrad() const { return Tensor{m_impl->getGrad()}; }
 
+Shape Tensor::getShape() const { return m_impl->m_shape; }
+
 Tensor Tensor::operator+(const Tensor& other) {
   return Tensor{add(m_impl, other.m_impl)};
 }

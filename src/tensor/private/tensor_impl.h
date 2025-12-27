@@ -24,6 +24,7 @@ struct TensorImpl {
   std::vector<size_t> m_strides;
   Shape m_shape;
   std::shared_ptr<TensorImpl> m_grad;
+  size_t m_offset = 0;
   // Automatically require gradient for now.
   // const bool requires_grad = false;
 
@@ -33,7 +34,10 @@ struct TensorImpl {
  public:
   std::unique_ptr<Operation> m_creator;
 
+  // Uses default strides for the shape.
   TensorImpl(const Shape& shape);
+  TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
+             std::shared_ptr<Storage> data);
 
   void fill_random();
   void print(std::ostream& os);
@@ -41,3 +45,10 @@ struct TensorImpl {
 
   void backward();
 };
+
+// TODO: in the future, this could be part of a tensor iterator class.
+size_t get_physical_offset(const std::vector<size_t>& coords,
+                           const std::vector<size_t>& strides,
+                           size_t offset = 0);
+
+void increment_coords(std::vector<size_t>& coords, const Shape& shape);

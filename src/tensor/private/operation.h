@@ -10,8 +10,8 @@
 
 #include "tensor_impl.h"
 
-// Stores all the state necessary to perform an operation backwards (is a
-// function object, in a sense).
+// Stores all the state necessary to perform an operation backwards (is
+// basically a function object).
 class Operation {
  public:
   virtual ~Operation() = default;
@@ -35,3 +35,7 @@ std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
                                 std::shared_ptr<TensorImpl> b,
                                 bool track_creator = true);
+
+std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
+                                      const Shape& target,
+                                      bool track_creator = true);

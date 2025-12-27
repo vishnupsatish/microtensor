@@ -5,10 +5,14 @@
 
 #pragma once
 
+#include <iostream>
 #include <set>
 #include <vector>
+struct Shape : std::vector<size_t> {
+  using std::vector<size_t>::vector;
 
-using Shape = std::vector<size_t>;
+  void print(std::ostream& os) const;
+};
 
 std::vector<size_t> defaultStridesFromShape(const Shape& shape);
 

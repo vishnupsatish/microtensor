@@ -5,9 +5,19 @@
 
 #include "shape.h"
 
+#include <iostream>
 #include <numeric>
 #include <set>
 #include <vector>
+
+void Shape::print(std::ostream& os) const {
+  os << "[";
+  for (size_t i = 0; i < size(); ++i) {
+    os << (*this)[i];
+    if (i < size() - 1) os << ", ";
+  }
+  os << "]";
+}
 
 std::vector<size_t> defaultStridesFromShape(const Shape& shape) {
   size_t ndim = shape.size();
@@ -26,7 +36,8 @@ size_t sizeFromShape(const Shape& shape) {
 
 std::optional<Shape> getBroadcastShape(const Shape& shape_a,
                                        const Shape& shape_b) {
-  Shape result(std::max(shape_a.size(), shape_b.size()));
+  Shape result;
+  result.reserve(std::max(shape_a.size(), shape_b.size()));
   auto it_a = shape_a.rbegin();
   auto it_b = shape_b.rbegin();
   while (it_a != shape_a.rend() || it_b != shape_b.rend()) {
@@ -39,10 +50,12 @@ std::optional<Shape> getBroadcastShape(const Shape& shape_a,
     } else if (dim_b == 1) {
       result.push_back(dim_a);
     } else {
+      // Invalid broadcast.
       return {};
     }
     if (it_a != shape_a.rend()) ++it_a;
     if (it_b != shape_b.rend()) ++it_b;
   }
+  std::reverse(result.begin(), result.end());
   return result;
 }

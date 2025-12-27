@@ -24,6 +24,7 @@ class Tensor {
   void fill_random();
   void print(std::ostream& os);
   Tensor getGrad() const;
+  Shape getShape() const;
 
   Tensor operator+(const Tensor& other);
   Tensor operator*(const Tensor& other);
