@@ -26,6 +26,10 @@ def run():
     c4 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
     results.append((a4 + b4 * c4).detach().numpy())
 
+    # Test 5
+    a5 = torch.tensor([[-1.0, 0.0], [1.0, 2.0]], dtype=torch.float32)
+    results.append(torch.tanh(a5).detach().numpy())
+
     return results
 
 if __name__ == "__main__":

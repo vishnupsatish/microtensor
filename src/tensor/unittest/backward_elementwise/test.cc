@@ -10,8 +10,8 @@ int main() {
     auto b = Tensor(Shape{2}, std::vector<float>{1.0, 2.0});
     auto c = a + b;
     c.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
   }
 
   // Test 2
@@ -20,8 +20,8 @@ int main() {
     auto b = Tensor(Shape{2}, std::vector<float>{10.0, 20.0});
     auto c = a * b;
     c.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
   }
 
   // Test 3
@@ -31,9 +31,9 @@ int main() {
     auto c = Tensor(Shape{2, 2}, std::vector<float>{5.0, 5.0, 5.0, 5.0});
     auto d = a * b + c;
     d.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
-    c.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
   }
 
   // Test 4
@@ -43,9 +43,9 @@ int main() {
     auto c = Tensor(Shape{1}, std::vector<float>{2.0});
     auto res = (a * b) + (a * c);
     res.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
-    c.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
   }
 
   // Test 5
@@ -55,9 +55,9 @@ int main() {
     auto c = Tensor(Shape{1}, std::vector<float>{10.0});
     auto res = (a + b) * (a + c) + b;
     res.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
-    c.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
   }
 
   // Test 6
@@ -67,9 +67,17 @@ int main() {
     auto c = Tensor(Shape{1, 1}, std::vector<float>{5.0});
     auto res = (a + b) * (a + c) * (b + c);
     res.backward();
-    a.getGrad().dump_tensor(std::cout);
-    b.getGrad().dump_tensor(std::cout);
-    c.getGrad().dump_tensor(std::cout);
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 7
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{-1.0, 0.0, 1.0, 2.0});
+    auto b = a.tanh();
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
   }
 
   return 0;

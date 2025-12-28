@@ -20,13 +20,13 @@
 
 namespace {
 
-void build_topo(Operation* op, std::set<Operation*>& visited,
-                std::vector<Operation*>& topo_order) {
+void buildTopo(Operation* op, std::set<Operation*>& visited,
+               std::vector<Operation*>& topo_order) {
   if (!op || visited.contains(op)) return;
   visited.insert(op);
   for (auto& input : op->m_parents) {
     if (input->m_creator) {
-      build_topo(input->m_creator.get(), visited, topo_order);
+      buildTopo(input->m_creator.get(), visited, topo_order);
     }
   }
   topo_order.push_back(op);
@@ -50,7 +50,7 @@ TensorImpl::TensorImpl(const Shape& shape, const std::vector<float>& data)
 
 std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
-void TensorImpl::fill_random() {
+void TensorImpl::fillRandom() {
   float mn = 0;
   float mx = 10;
 
@@ -67,12 +67,12 @@ void TensorImpl::fill_random() {
 }
 
 // Initialize to all ones.
-void TensorImpl::initialize_grad() {
+void TensorImpl::initializeGrad() {
   m_grad = std::make_shared<TensorImpl>(m_shape);
   std::fill(std::begin(*m_grad->m_data), std::end(*m_grad->m_data), 1.0);
 }
 
-void TensorImpl::accumulate_grad(std::shared_ptr<TensorImpl> new_grad) {
+void TensorImpl::accumulateGrad(std::shared_ptr<TensorImpl> new_grad) {
   if (!m_grad) {
     m_grad = new_grad;
   } else {
@@ -83,14 +83,14 @@ void TensorImpl::accumulate_grad(std::shared_ptr<TensorImpl> new_grad) {
 
 void TensorImpl::backward() {
   if (!m_grad) {
-    initialize_grad();
+    initializeGrad();
   }
 
   std::vector<Operation*> topo_order;
   std::set<Operation*> visited;
 
   if (this->m_creator) {
-    build_topo(this->m_creator.get(), visited, topo_order);
+    buildTopo(this->m_creator.get(), visited, topo_order);
   }
 
   std::reverse(topo_order.begin(), topo_order.end());
@@ -103,11 +103,12 @@ void TensorImpl::backward() {
     for (size_t i = 0; i < op->m_parents.size(); ++i) {
       auto input = op->m_parents[i];
       auto calculated_grad = inp_grads[i];
-      input->accumulate_grad(calculated_grad);
+      input->accumulateGrad(calculated_grad);
     }
   }
 }
 
+// Note: written by AI.
 void TensorImpl::print(std::ostream& os) {
   // Case 0: Scalar (0-D)
   if (m_shape.empty()) {
@@ -121,7 +122,7 @@ void TensorImpl::print(std::ostream& os) {
   auto recursive_print = [&](auto& self, size_t dim) -> void {
     // Base case: we've reached the innermost level, print the value
     if (dim == m_shape.size()) {
-      os << (*m_data)[get_physical_offset(coords, m_strides, m_offset)];
+      os << (*m_data)[getPhysicalOffset(coords, m_strides, m_offset)];
       return;
     }
 
@@ -153,7 +154,7 @@ void TensorImpl::print(std::ostream& os) {
 // rank
 // shape[0] shape[1] ... shape[rank-1]
 // data[0] data[1] ... data[total_elements-1]
-void TensorImpl::dump_tensor(std::ostream& os) {
+void TensorImpl::dumpTensor(std::ostream& os) {
   os << m_shape.size() << "\n";
   for (size_t dim : m_shape) {
     os << dim << " ";
@@ -166,15 +167,15 @@ void TensorImpl::dump_tensor(std::ostream& os) {
   os << std::fixed << std::setprecision(6);  // 6 decimal places
 
   for (size_t i = 0; i < total_elements; ++i) {
-    size_t offset = get_physical_offset(coords, m_strides, m_offset);
+    size_t offset = getPhysicalOffset(coords, m_strides, m_offset);
     os << (*m_data)[offset] << " ";
-    increment_coords(coords, m_shape);
+    incrementCoords(coords, m_shape);
   }
   os << "\n";
 }
 
-size_t get_physical_offset(const std::vector<size_t>& coords,
-                           const std::vector<size_t>& strides, size_t offset) {
+size_t getPhysicalOffset(const std::vector<size_t>& coords,
+                         const std::vector<size_t>& strides, size_t offset) {
   size_t out = offset;
   for (size_t i = 0; i < coords.size(); ++i) {
     out += coords[i] * strides[i];
@@ -182,7 +183,7 @@ size_t get_physical_offset(const std::vector<size_t>& coords,
   return out;
 }
 
-void increment_coords(std::vector<size_t>& coords, const Shape& shape) {
+void incrementCoords(std::vector<size_t>& coords, const Shape& shape) {
   // add an assertion to make sure we are not incrementing past the shape.
   for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
     coords[i]++;
@@ -191,8 +192,8 @@ void increment_coords(std::vector<size_t>& coords, const Shape& shape) {
   }
 }
 
-std::vector<size_t> get_broadcast_strides(std::shared_ptr<TensorImpl> a,
-                                          const Shape& target) {
+std::vector<size_t> getBroadcastStrides(std::shared_ptr<TensorImpl> a,
+                                        const Shape& target) {
   std::vector<size_t> strides(target.size(), 0);
   auto it_target_dim = target.rbegin();
   auto it_new_stride = strides.rbegin();

@@ -10,7 +10,7 @@ import os
 sys.dont_write_bytecode = True
 
 def parse_cpp_stdout(output):
-    """Parses the specialized stdout format from the C++ dump_tensor."""
+    """Parses the specialized stdout format from the C++ dumpTensor."""
     lines = [l.strip() for l in output.split('\n') if l.strip()]
     if not lines: return []
     

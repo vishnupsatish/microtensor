@@ -10,13 +10,13 @@
 
 int main() {
   auto a = Tensor(Shape{2, 2});
-  a.fill_random();
+  a.fillRandom();
   std::cout << "a: ";
   a.print(std::cout);
   std::cout << '\n';
 
   auto b = Tensor(Shape{2, 1, 2});
-  b.fill_random();
+  b.fillRandom();
   std::cout << "b: ";
   b.print(std::cout);
   std::cout << '\n';

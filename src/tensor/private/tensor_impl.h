@@ -30,8 +30,8 @@ struct TensorImpl {
   // Automatically require gradient for now.
   // const bool requires_grad = false;
 
-  void initialize_grad();
-  void accumulate_grad(std::shared_ptr<TensorImpl> new_grad);
+  void initializeGrad();
+  void accumulateGrad(std::shared_ptr<TensorImpl> new_grad);
 
  public:
   std::unique_ptr<Operation> m_creator;
@@ -42,9 +42,9 @@ struct TensorImpl {
              std::shared_ptr<Storage> data);
   TensorImpl(const Shape& shape, const std::vector<float>& data);
 
-  void fill_random();
+  void fillRandom();
   void print(std::ostream& os);
-  void dump_tensor(std::ostream& os);
+  void dumpTensor(std::ostream& os);
 
   std::shared_ptr<TensorImpl> getGrad() const;
 
@@ -52,11 +52,10 @@ struct TensorImpl {
 };
 
 // TODO: in the future, this could be part of a tensor iterator class.
-size_t get_physical_offset(const std::vector<size_t>& coords,
-                           const std::vector<size_t>& strides,
-                           size_t offset = 0);
+size_t getPhysicalOffset(const std::vector<size_t>& coords,
+                         const std::vector<size_t>& strides, size_t offset = 0);
 
-void increment_coords(std::vector<size_t>& coords, const Shape& shape);
+void incrementCoords(std::vector<size_t>& coords, const Shape& shape);
 
-std::vector<size_t> get_broadcast_strides(std::shared_ptr<TensorImpl> a,
-                                          const Shape& target);
+std::vector<size_t> getBroadcastStrides(std::shared_ptr<TensorImpl> a,
+                                        const Shape& target);

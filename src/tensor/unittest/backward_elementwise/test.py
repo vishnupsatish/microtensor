@@ -59,6 +59,12 @@ def run():
     results.append(b6.grad.numpy())
     results.append(c6.grad.numpy())
 
+    # Test 7
+    a7 = torch.tensor([[-1.0, 0.0], [1.0, 2.0]], dtype=torch.float32, requires_grad=True)
+    b7 = torch.tanh(a7)
+    b7.backward(torch.ones_like(b7))
+    results.append(a7.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

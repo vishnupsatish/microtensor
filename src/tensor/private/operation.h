@@ -39,3 +39,6 @@ std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target,
                                       bool track_creator = true);
+
+std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
+                                 bool track_creator = true);
