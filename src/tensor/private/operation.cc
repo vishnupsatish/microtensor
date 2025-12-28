@@ -14,8 +14,6 @@
 
 namespace {
 
-// TODO: This can probably become compile-time polymorphism, unless we want to
-// allow users to write Tensor functions / deep learning models at runtime.
 class AddOp : public Operation {
  public:
   using Operation::Operation;
@@ -67,7 +65,7 @@ class BroadcastOp : public Operation {
     std::vector<size_t> coords(grad_output->m_shape.size(), 0);
 
     for (size_t i = 0; i < total_elements; ++i) {
-      // I think grad_input->m_offset will always be 0...
+      // grad_input's offset will always be 0, since it is a new tensor.
       size_t offset_view =
           get_physical_offset(coords, broadcast_strides, grad_input->m_offset);
       size_t offset_out = get_physical_offset(coords, grad_output->m_strides,
