@@ -5,6 +5,7 @@
 
 #include "shape.h"
 
+#include <cassert>
 #include <iostream>
 #include <numeric>
 #include <set>
@@ -58,4 +59,36 @@ std::optional<Shape> getBroadcastShape(const Shape& shape_a,
   }
   std::reverse(result.begin(), result.end());
   return result;
+}
+
+// Returns new shape of `a`, then `b`.
+std::optional<std::pair<Shape, Shape>> getBroadcastShapesForMatmul(
+    const Shape& shape_a, const Shape& shape_b) {
+  assert(shape_a.size() >= 2);
+  assert(shape_b.size() >= 2);
+  auto rankA = shape_a.size();
+  auto rankB = shape_b.size();
+  Shape a_res;
+  Shape b_res;
+  a_res.reserve(std::max(shape_a.size(), shape_b.size()));
+  b_res.reserve(std::max(shape_a.size(), shape_b.size()));
+  // Check validity of last two dimensions. e.g., 5,6 x 6,2 is valid.
+  if (shape_a[rankA - 1] != shape_b[rankB - 2]) {
+    return {};
+  }
+  // Broadcast last N-2 dimensions.
+  auto aShapeRm2 = Shape(shape_a.begin(), shape_a.end() - 2);
+  auto bShapeRm2 = Shape(shape_b.begin(), shape_b.end() - 2);
+  auto broadcasted = getBroadcastShape(aShapeRm2, bShapeRm2);
+  if (!broadcasted) {
+    return {};
+  }
+  // Add back the last two dimensions of a and b.
+  auto aRet = *broadcasted;
+  aRet.push_back(shape_a[rankA - 2]);
+  aRet.push_back(shape_a[rankA - 1]);
+  auto bRet = *broadcasted;
+  bRet.push_back(shape_b[rankB - 2]);
+  bRet.push_back(shape_b[rankB - 1]);
+  return std::make_pair(aRet, bRet);
 }

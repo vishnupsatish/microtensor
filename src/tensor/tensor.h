@@ -24,16 +24,14 @@ class Tensor {
 
   void fillRandom();
   void print(std::ostream& os);
+  void dumpTensor(std::ostream& os);
   Tensor getGrad() const;
   Shape getShape() const;
 
-  void dumpTensor(std::ostream& os);
-
   Tensor operator+(const Tensor& other);
   Tensor operator*(const Tensor& other);
-
   Tensor tanh();
+  Tensor matmul(const Tensor& other);
 
-  // Populating gradients backwards.
   void backward();
 };

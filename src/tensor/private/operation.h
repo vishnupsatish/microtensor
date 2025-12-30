@@ -10,8 +10,6 @@
 
 #include "tensor_impl.h"
 
-// Stores all the state necessary to perform an operation backwards (is
-// basically a function object).
 class Operation {
  public:
   virtual ~Operation() = default;
@@ -40,5 +38,15 @@ std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target,
                                       bool track_creator = true);
 
+std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a, int dimInput,
+                                    bool track_creator = true);
+
+std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
+                                      int dimInput, bool track_creator = true);
+
 std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
                                  bool track_creator = true);
+
+std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
+                                   std::shared_ptr<TensorImpl> b,
+                                   bool track_creator = true);

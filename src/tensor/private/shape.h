@@ -20,3 +20,6 @@ size_t sizeFromShape(const Shape& shape);
 
 std::optional<Shape> getBroadcastShape(const Shape& shape1,
                                        const Shape& shape2);
+
+std::optional<std::pair<Shape, Shape>> getBroadcastShapesForMatmul(
+    const Shape& shape_a, const Shape& shape_b);

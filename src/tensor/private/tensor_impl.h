@@ -47,6 +47,7 @@ struct TensorImpl {
   void dumpTensor(std::ostream& os);
 
   std::shared_ptr<TensorImpl> getGrad() const;
+  size_t getRank() const;
 
   void backward();
 };

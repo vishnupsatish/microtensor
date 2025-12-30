@@ -40,6 +40,10 @@ Tensor Tensor::operator*(const Tensor& other) {
 
 Tensor Tensor::tanh() { return Tensor{::tanh(m_impl)}; }
 
+Tensor Tensor::matmul(const Tensor& other) {
+  return Tensor{::matmul(m_impl, other.m_impl)};
+}
+
 void Tensor::backward() { m_impl->backward(); }
 
 void Tensor::dumpTensor(std::ostream& os) { m_impl->dumpTensor(os); }

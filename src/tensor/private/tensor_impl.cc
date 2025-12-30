@@ -50,6 +50,8 @@ TensorImpl::TensorImpl(const Shape& shape, const std::vector<float>& data)
 
 std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
+size_t TensorImpl::getRank() const { return m_shape.size(); }
+
 void TensorImpl::fillRandom() {
   float mn = 0;
   float mx = 10;
@@ -98,7 +100,6 @@ void TensorImpl::backward() {
   for (auto op : topo_order) {
     std::shared_ptr<TensorImpl> outTensor = op->m_output.lock();
     auto inp_grads = op->backward(outTensor->m_grad);
-    // Accumulate gradients for inputs.
     assert(inp_grads.size() == op->m_parents.size());
     for (size_t i = 0; i < op->m_parents.size(); ++i) {
       auto input = op->m_parents[i];
@@ -118,25 +119,17 @@ void TensorImpl::print(std::ostream& os) {
 
   std::vector<size_t> coords(m_shape.size(), 0);
 
-  // Recursive helper to handle nested brackets and indentation
   auto recursive_print = [&](auto& self, size_t dim) -> void {
-    // Base case: we've reached the innermost level, print the value
     if (dim == m_shape.size()) {
       os << (*m_data)[getPhysicalOffset(coords, m_strides, m_offset)];
       return;
     }
-
     os << "[";
     for (size_t i = 0; i < m_shape[dim]; ++i) {
       coords[dim] = i;
       self(self, dim + 1);
-
-      // If there's another element in this dimension, add a comma
       if (i < m_shape[dim] - 1) {
         os << ", ";
-
-        // If we are printing anything deeper than a 1D vector,
-        // add a newline and indentation for readability
         if (m_shape.size() - dim > 1) {
           os << "\n";
           for (size_t j = 0; j <= dim; ++j) os << "  ";
@@ -176,6 +169,7 @@ void TensorImpl::dumpTensor(std::ostream& os) {
 
 size_t getPhysicalOffset(const std::vector<size_t>& coords,
                          const std::vector<size_t>& strides, size_t offset) {
+  // inefficient.
   size_t out = offset;
   for (size_t i = 0; i < coords.size(); ++i) {
     out += coords[i] * strides[i];
@@ -184,7 +178,8 @@ size_t getPhysicalOffset(const std::vector<size_t>& coords,
 }
 
 void incrementCoords(std::vector<size_t>& coords, const Shape& shape) {
-  // add an assertion to make sure we are not incrementing past the shape.
+  // also add an assertion to make sure we are not incrementing past the shape.
+  assert(coords.size() == shape.size());
   for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
     coords[i]++;
     if (coords[i] < shape[i]) return;
