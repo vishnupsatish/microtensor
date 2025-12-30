@@ -122,7 +122,8 @@ class BroadcastOp : public Operation {
 
     for (size_t i = 0; i < total_elements; ++i) {
       // grad_input's offset will always be 0, since it is a new tensor.
-      // Somewhat of a hack.
+      // Somewhat of a hack since we use broadcasted strides but we're not
+      // actually broadcasting anything.
       size_t offset_view =
           getPhysicalOffset(coords, broadcast_strides, grad_input->m_offset);
       size_t offset_out = getPhysicalOffset(coords, grad_output->m_strides,
@@ -164,15 +165,49 @@ class UnsqueezeOp : public Operation {
     return {grad_input};
   }
 };
-
 class MatmulOp : public Operation {
  public:
   using Operation::Operation;
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    // TODO: implement.
-    return {};
+    // Invariant: inputs are matmul-compatible.
+    size_t rank = grad_output->getRank();
+    auto a = m_parents[0];
+    auto b = m_parents[1];
+    assert(rank == a->getRank());
+    assert(rank == b->getRank());
+    std::vector<size_t> permuteDims;
+    permuteDims.reserve(rank);
+    for (size_t i = 0; i < rank - 2; ++i) {
+      permuteDims.push_back(i);
+    }
+    permuteDims.push_back(rank - 1);
+    permuteDims.push_back(rank - 2);
+    auto aTranspose = permute(a, permuteDims, false);
+    auto bTranspose = permute(b, permuteDims, false);
+    auto dA = matmul(grad_output, bTranspose, false);
+    auto dB = matmul(aTranspose, grad_output, false);
+    return {dA, dB};
+  }
+};
+
+class PermuteOp : public Operation {
+  std::vector<size_t> m_dims;
+
+ public:
+  PermuteOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+            std::shared_ptr<TensorImpl> output, std::vector<size_t> dims)
+      : Operation(std::move(parents), output), m_dims(std::move(dims)) {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    std::vector<size_t> reverseDims(m_dims.size());
+    for (size_t i = 0; i < m_dims.size(); ++i) {
+      reverseDims[m_dims[i]] = i;
+    }
+    auto grad_input = permute(grad_output, reverseDims, false);
+    return {grad_input};
   }
 };
 
@@ -267,6 +302,18 @@ void matmul_batched(std::shared_ptr<TensorImpl> c,
   }
 }
 
+bool isPermutation(const std::vector<size_t>& v) {
+  int n = v.size();
+  std::vector<bool> seen(n, false);
+
+  for (int x : v) {
+    if (x < 0 || x >= n) return false;
+    if (seen[x]) return false;
+    seen[x] = true;
+  }
+  return true;
+}
+
 }  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -327,7 +374,7 @@ std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a, int dimInput,
     return a;
   }
   shape.erase(shape.begin() + dim);
-  strides.erase(shape.begin() + dim);
+  strides.erase(strides.begin() + dim);
   auto out = std::make_shared<TensorImpl>(shape, strides, a->m_data);
   if (track_creator) {
     out->m_creator = std::make_unique<SqueezeOp>(std::vector{a}, out, dim);
@@ -398,4 +445,24 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
     matmulRes = squeeze(matmulRes, -1, track_creator);
   }
   return matmulRes;
+}
+
+std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
+                                    std::vector<size_t> dims,
+                                    bool track_creator) {
+  size_t rank = a->getRank();
+  if (dims.size() != rank || !isPermutation(dims)) {
+    throw std::runtime_error("Incorrect dims value passed to permute");
+  }
+  Shape newShape(rank);
+  std::vector<size_t> newStrides(rank);
+  for (size_t i = 0; i < rank; ++i) {
+    newShape[i] = a->m_shape[dims[i]];
+    newStrides[i] = a->m_strides[dims[i]];
+  }
+  auto out = std::make_shared<TensorImpl>(newShape, newStrides, a->m_data);
+  if (track_creator) {
+    out->m_creator = std::make_unique<PermuteOp>(std::vector{a}, out, dims);
+  }
+  return out;
 }

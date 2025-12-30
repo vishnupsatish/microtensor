@@ -1,6 +1,8 @@
-# Basic Deep Learning Engine in C++
+# MicroTensor – Small DL Library in C++
 
 Inspired by some of the things I worked on and saw colleagues work on at Huawei.
+
+No external dependencies; meaning everything, starting from tensors, are implemented from scratch.
 
 ### Goals
 

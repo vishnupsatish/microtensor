@@ -32,6 +32,7 @@ class Tensor {
   Tensor operator*(const Tensor& other);
   Tensor tanh();
   Tensor matmul(const Tensor& other);
+  Tensor permute(const std::vector<size_t>& dims);
 
   void backward();
 };

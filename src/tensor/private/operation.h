@@ -50,3 +50,7 @@ std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
                                    std::shared_ptr<TensorImpl> b,
                                    bool track_creator = true);
+
+std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
+                                    std::vector<size_t> dims,
+                                    bool track_creator = true);

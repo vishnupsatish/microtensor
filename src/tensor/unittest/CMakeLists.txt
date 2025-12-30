@@ -10,6 +10,10 @@ add_executable(forward_matmul_exe forward_matmul/test.cc)
 target_link_libraries(forward_matmul_exe Tensor)
 target_include_directories(forward_matmul_exe PRIVATE ..)
 
+add_executable(backward_matmul_exe backward_matmul/test.cc)
+target_link_libraries(backward_matmul_exe Tensor)
+target_include_directories(backward_matmul_exe PRIVATE ..)
+
 # Force CMake to look for the virtual environment first
 set(Python3_FIND_VIRTUALENV ONLY)
 set(Python3_ROOT_DIR "${CMAKE_SOURCE_DIR}/../venv")
@@ -37,4 +41,10 @@ add_test(NAME forward_matmul_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_and_compare.py 
             $<TARGET_FILE:forward_matmul_exe> 
             ${CMAKE_CURRENT_SOURCE_DIR}/forward_matmul/test.py
+)
+
+add_test(NAME backward_matmul_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_and_compare.py 
+            $<TARGET_FILE:backward_matmul_exe> 
+            ${CMAKE_CURRENT_SOURCE_DIR}/backward_matmul/test.py
 )

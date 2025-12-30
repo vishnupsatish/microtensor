@@ -44,6 +44,10 @@ Tensor Tensor::matmul(const Tensor& other) {
   return Tensor{::matmul(m_impl, other.m_impl)};
 }
 
+Tensor Tensor::permute(const std::vector<size_t>& dims) {
+  return Tensor{::permute(m_impl, dims)};
+}
+
 void Tensor::backward() { m_impl->backward(); }
 
 void Tensor::dumpTensor(std::ostream& os) { m_impl->dumpTensor(os); }
