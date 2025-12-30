@@ -383,6 +383,7 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   auto matmulRes = std::make_shared<TensorImpl>(outShape);
 
   matmul_batched(matmulRes, a_bc, b_bc);
+
   if (track_creator) {
     matmulRes->m_creator =
         std::make_unique<MatmulOp>(std::vector{a_bc, b_bc}, matmulRes);

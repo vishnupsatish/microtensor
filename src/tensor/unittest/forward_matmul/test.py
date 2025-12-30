@@ -19,6 +19,21 @@ def run():
     b3 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
     results.append(torch.matmul(a3, b3).numpy())
 
+    # Test 4: Vector-Vector Dot Product
+    a4 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
+    b4 = torch.tensor([4.0, 5.0, 6.0], dtype=torch.float32)
+    results.append(torch.matmul(a4, b4).numpy())
+
+    # Test 5: Vector-Matrix Multiplication
+    a5 = torch.tensor([1.0, 2.0], dtype=torch.float32)
+    b5 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
+    results.append(torch.matmul(a5, b5).numpy())
+
+    # Test 6: 4D Batched Matmul with Broadcasting
+    a6 = torch.ones((2, 1, 4, 3), dtype=torch.float32)
+    b6 = torch.ones((1, 3, 3, 2), dtype=torch.float32) * 2.0
+    results.append(torch.matmul(a6, b6).numpy())
+
     return results
 
 if __name__ == "__main__":

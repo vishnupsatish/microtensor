@@ -17,14 +17,19 @@ def parse_cpp_stdout(output):
     tensors = []
     i = 0
     while i < len(lines):
-        try:
-            rank = int(lines[i])
-            shape = list(map(int, lines[i+1].split()))
-            values = list(map(float, lines[i+2].split()))
-            tensors.append(np.array(values).reshape(shape))
-            i += 3
-        except (ValueError, IndexError):
-            i += 1
+        inc = 0
+        rank = int(lines[i])
+        inc += 1
+        if rank != 0:
+            shape = list(map(int, lines[i+inc].split()))
+            inc += 1
+        else:
+            shape = []
+        values = list(map(float, lines[i+inc].split()))
+        inc += 1
+        tensors.append(np.array(values).reshape(shape))
+        i += inc
+
     return tensors
 
 def run_test(cpp_executable, py_reference):
