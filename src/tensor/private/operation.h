@@ -38,11 +38,13 @@ std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target,
                                       bool track_creator = true);
 
-std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a, int dimInput,
+std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
+                                    std::vector<int> dimInputs,
                                     bool track_creator = true);
 
 std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
-                                      int dimInput, bool track_creator = true);
+                                      std::vector<int> dimInputs,
+                                      bool track_creator = true);
 
 std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
                                  bool track_creator = true);
@@ -54,3 +56,7 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
                                     std::vector<size_t> dims,
                                     bool track_creator = true);
+
+std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
+                                      std::vector<int> dimInputs,
+                                      bool keep_dims, bool track_creator);

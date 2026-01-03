@@ -33,6 +33,8 @@ class Tensor {
   Tensor tanh();
   Tensor matmul(const Tensor& other);
   Tensor permute(const std::vector<size_t>& dims);
+  Tensor broadcast(const Shape& target);
+  Tensor reduceSum(const std::vector<int>& dims, bool keep_dims = false);
 
   void backward();
 };

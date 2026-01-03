@@ -85,7 +85,6 @@ class MulOp : public Operation {
     // double-backprop, so we'll implement if/when that time comes.
     auto grad_op1 = multiply(grad_output, m_parents[1], false);
     auto grad_op2 = multiply(grad_output, m_parents[0], false);
-
     return {grad_op1, grad_op2};
   }
 };
@@ -110,58 +109,52 @@ class BroadcastOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    // For any prepended dims, we need to reduce and not keep dims. For
+    // non-prepended dims that were broadcasted, reduce and keep dims.
     auto input = m_parents[0];
-
-    auto grad_input = std::make_shared<TensorImpl>(input->m_shape);
-    std::fill(grad_input->m_data->begin(), grad_input->m_data->end(), 0.0f);
-    auto broadcast_strides =
-        getBroadcastStrides(grad_input, grad_output->m_shape);
-
-    size_t total_elements = sizeFromShape(grad_output->m_shape);
-    std::vector<size_t> coords(grad_output->m_shape.size(), 0);
-
-    for (size_t i = 0; i < total_elements; ++i) {
-      // grad_input's offset will always be 0, since it is a new tensor.
-      // Somewhat of a hack since we use broadcasted strides but we're not
-      // actually broadcasting anything.
-      size_t offset_view =
-          getPhysicalOffset(coords, broadcast_strides, grad_input->m_offset);
-      size_t offset_out = getPhysicalOffset(coords, grad_output->m_strides,
-                                            grad_output->m_offset);
-      (*grad_input->m_data)[offset_view] += (*grad_output->m_data)[offset_out];
-      incrementCoords(coords, grad_output->m_shape);
+    int diff = grad_output->getRank() - input->getRank();
+    std::vector<int> prependedDims;
+    for (int i = 0; i < diff; ++i) {
+      prependedDims.push_back(i);
     }
-
+    auto rmPrepended = reduceSum(grad_output, prependedDims, false, false);
+    std::vector<int> dimsToReduce;
+    for (size_t i = 0; i < input->getRank(); ++i) {
+      if (input->m_shape[i] == 1 && rmPrepended->m_shape[i] > 1) {
+        dimsToReduce.push_back(i);
+      }
+    }
+    auto grad_input = reduceSum(rmPrepended, dimsToReduce, true, false);
     return {grad_input};
   }
 };
 
 class SqueezeOp : public Operation {
-  int m_dim;
+  std::vector<int> m_dims;
 
  public:
   SqueezeOp(std::vector<std::shared_ptr<TensorImpl>> parents,
-            std::shared_ptr<TensorImpl> output, int dim)
-      : Operation(std::move(parents), output), m_dim(dim) {}
+            std::shared_ptr<TensorImpl> output, std::vector<int> dims)
+      : Operation(std::move(parents), output), m_dims(std::move(dims)) {}
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    auto grad_input = unsqueeze(grad_output, m_dim, false);
+    auto grad_input = unsqueeze(grad_output, m_dims, false);
     return {grad_input};
   }
 };
 
 class UnsqueezeOp : public Operation {
-  int m_dim;
+  std::vector<int> m_dims;
 
  public:
   UnsqueezeOp(std::vector<std::shared_ptr<TensorImpl>> parents,
-              std::shared_ptr<TensorImpl> output, int dim)
-      : Operation(std::move(parents), output), m_dim(dim) {}
+              std::shared_ptr<TensorImpl> output, std::vector<int> dims)
+      : Operation(std::move(parents), output), m_dims(std::move(dims)) {}
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    auto grad_input = squeeze(grad_output, m_dim, false);
+    auto grad_input = squeeze(grad_output, m_dims, false);
     return {grad_input};
   }
 };
@@ -171,12 +164,14 @@ class MatmulOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    // Invariant: inputs are matmul-compatible.
+    // Invariant: inputs are matmul-compatible without the need for any
+    // broadcasting/squeezing/unsqueezing.
     size_t rank = grad_output->getRank();
     auto a = m_parents[0];
     auto b = m_parents[1];
     assert(rank == a->getRank());
     assert(rank == b->getRank());
+    // Transpose the matrix; only concerns the last two dimensions.
     std::vector<size_t> permuteDims;
     permuteDims.reserve(rank);
     for (size_t i = 0; i < rank - 2; ++i) {
@@ -211,6 +206,17 @@ class PermuteOp : public Operation {
   }
 };
 
+class ReduceSumOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto input = m_parents[0];
+    return {broadcast(grad_output, input->m_shape, false)};
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // Helper to align two tensors to a common broadcasted shape.
@@ -234,13 +240,13 @@ std::pair<std::shared_ptr<TensorImpl>, std::shared_ptr<TensorImpl>> alignInputs(
 
 // Performs C = A * B for a single matrix slice
 // Assumes pointers are already offset to the correct batch location
-void matmul_2d_kernel(float* ptr_c, const float* ptr_a, const float* ptr_b,
-                      size_t m, size_t k, size_t n, size_t stride_a_m,
-                      size_t stride_a_k,  // Strides for A's last 2 dims
-                      size_t stride_b_k,
-                      size_t stride_b_n,  // Strides for B's last 2 dims
-                      size_t stride_c_m,
-                      size_t stride_c_n  // Strides for C's last 2 dims
+void matmulKernel(float* ptr_c, const float* ptr_a, const float* ptr_b,
+                  size_t m, size_t k, size_t n, size_t stride_a_m,
+                  size_t stride_a_k,  // Strides for A's last 2 dims
+                  size_t stride_b_k,
+                  size_t stride_b_n,  // Strides for B's last 2 dims
+                  size_t stride_c_m,
+                  size_t stride_c_n  // Strides for C's last 2 dims
 ) {
   for (size_t i = 0; i < m; ++i) {    // rows of A
     for (size_t j = 0; j < n; ++j) {  // columns of B
@@ -258,9 +264,8 @@ void matmul_2d_kernel(float* ptr_c, const float* ptr_a, const float* ptr_b,
   }
 }
 
-void matmul_batched(std::shared_ptr<TensorImpl> c,
-                    std::shared_ptr<TensorImpl> a,
-                    std::shared_ptr<TensorImpl> b) {
+void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
+                   std::shared_ptr<TensorImpl> b) {
   size_t rank = c->getRank();
 
   size_t batch_rank = rank - 2;
@@ -293,10 +298,10 @@ void matmul_batched(std::shared_ptr<TensorImpl> c,
     float* ptr_a = a->m_data->data() + offset_a;
     float* ptr_b = b->m_data->data() + offset_b;
     float* ptr_c = c->m_data->data() + offset_c;
-    matmul_2d_kernel(ptr_c, ptr_a, ptr_b, m, k, n, a->m_strides[rank - 2],
-                     a->m_strides[rank - 1], b->m_strides[rank - 2],
-                     b->m_strides[rank - 1], c->m_strides[rank - 2],
-                     c->m_strides[rank - 1]);
+    matmulKernel(ptr_c, ptr_a, ptr_b, m, k, n, a->m_strides[rank - 2],
+                 a->m_strides[rank - 1], b->m_strides[rank - 2],
+                 b->m_strides[rank - 1], c->m_strides[rank - 2],
+                 c->m_strides[rank - 1]);
 
     incrementCoords(current_coords, batch_shape);  // [0,0] -> [0,1]
   }
@@ -356,7 +361,6 @@ std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
   // Assumes broadcastable, not intended to be a user-facing function for now.
   // only used for implicit broadcasting.
   auto strides = getBroadcastStrides(a, target);
-  // Share the data.
   auto out = std::make_shared<TensorImpl>(target, strides, a->m_data);
   out->m_offset = a->m_offset;
   if (track_creator) {
@@ -365,33 +369,53 @@ std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
   return out;
 }
 
-std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a, int dimInput,
+std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
+                                    std::vector<int> dimInputs,
                                     bool track_creator) {
-  size_t dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
   auto shape = a->m_shape;
   auto strides = a->m_strides;
-  if (shape[dim] != 1) {
-    return a;
+  std::vector<int> normalizedDims;
+  for (auto dimInput : dimInputs) {
+    int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
+    if (shape[dim] != 1) {
+      // PyTorch semantics; does not error, just continues and does not squeeze
+      // that dim.
+      continue;
+    }
+    normalizedDims.push_back(dim);
   }
-  shape.erase(shape.begin() + dim);
-  strides.erase(strides.begin() + dim);
+  sort(normalizedDims.rbegin(), normalizedDims.rend());
+  for (auto dim : normalizedDims) {
+    shape.erase(shape.begin() + dim);
+    strides.erase(strides.begin() + dim);
+  }
   auto out = std::make_shared<TensorImpl>(shape, strides, a->m_data);
   if (track_creator) {
-    out->m_creator = std::make_unique<SqueezeOp>(std::vector{a}, out, dim);
+    out->m_creator =
+        std::make_unique<SqueezeOp>(std::vector{a}, out, normalizedDims);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
-                                      int dimInput, bool track_creator) {
-  size_t dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput + 1;
+                                      std::vector<int> dimInputs,
+                                      bool track_creator) {
   auto shape = a->m_shape;
   auto strides = a->m_strides;
-  shape.insert(shape.begin() + dim, 1);
-  strides.insert(strides.begin() + dim, 0);
+  std::vector<int> normalizedDims;
+  for (auto dimInput : dimInputs) {
+    int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput + 1;
+    normalizedDims.push_back(dim);
+  }
+  sort(normalizedDims.begin(), normalizedDims.end());
+  for (auto dim : normalizedDims) {
+    shape.insert(shape.begin() + dim, 1);
+    strides.insert(strides.begin() + dim, 0);
+  }
   auto out = std::make_shared<TensorImpl>(shape, strides, a->m_data);
   if (track_creator) {
-    out->m_creator = std::make_unique<UnsqueezeOp>(std::vector{a}, out, dim);
+    out->m_creator =
+        std::make_unique<UnsqueezeOp>(std::vector{a}, out, normalizedDims);
   }
   return out;
 }
@@ -405,8 +429,8 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
 
   // Following the rules provided in
   // https://docs.pytorch.org/docs/stable/generated/torch.matmul.html.
-  auto a_2d = a->getRank() == 1 ? unsqueeze(a, -2, track_creator) : a;
-  auto b_2d = b->getRank() == 1 ? unsqueeze(b, -1, track_creator) : b;
+  auto a_2d = a->getRank() == 1 ? unsqueeze(a, {-2}, track_creator) : a;
+  auto b_2d = b->getRank() == 1 ? unsqueeze(b, {-1}, track_creator) : b;
 
   // Broadcast the first rank-2 dimensions
   auto shapesOpt = getBroadcastShapesForMatmul(a_2d->m_shape, b_2d->m_shape);
@@ -429,20 +453,24 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   outShape.push_back(b_bc->m_shape[b_bc->m_shape.size() - 1]);
   auto matmulRes = std::make_shared<TensorImpl>(outShape);
 
-  matmul_batched(matmulRes, a_bc, b_bc);
+  matmulBatched(matmulRes, a_bc, b_bc);
 
   if (track_creator) {
     matmulRes->m_creator =
         std::make_unique<MatmulOp>(std::vector{a_bc, b_bc}, matmulRes);
   }
 
+  std::vector<int> squeezeDims;
   if (a->getRank() == 1) {
-    // Note: the old matmulRes still exists if track_creator is enabled, as a
-    // shared pointer.
-    matmulRes = squeeze(matmulRes, -2, track_creator);
+    squeezeDims.push_back(-2);
   }
   if (b->getRank() == 1) {
-    matmulRes = squeeze(matmulRes, -1, track_creator);
+    squeezeDims.push_back(-1);
+  }
+  if (!squeezeDims.empty()) {
+    // Note: the old matmulRes still exists if track_creator is enabled, as a
+    // shared pointer.
+    matmulRes = squeeze(matmulRes, squeezeDims, track_creator);
   }
   return matmulRes;
 }
@@ -463,6 +491,51 @@ std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
   auto out = std::make_shared<TensorImpl>(newShape, newStrides, a->m_data);
   if (track_creator) {
     out->m_creator = std::make_unique<PermuteOp>(std::vector{a}, out, dims);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
+                                      std::vector<int> dimInputs,
+                                      bool keep_dims, bool track_creator) {
+  Shape outShape = a->m_shape;
+  std::vector<int> normalizedDims;
+  for (auto dimInput : dimInputs) {
+    int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
+    // TODO: check if `dim` invalid.
+    normalizedDims.push_back(dim);
+    outShape[dim] = 1;
+  }
+  auto out = std::make_shared<TensorImpl>(outShape);
+  std::fill(out->m_data->begin(), out->m_data->end(), 0.0f);
+  // Get the strides as if we are broadcasting `out` to the input's shape.
+  // This sets stride value to 0 wherever `out`'s dimension size is 1.
+  // Therefore, when iterating, we just need to iterate on the input's coords,
+  // and use these strides (which match up with where we want to accumulate
+  // values).
+  auto broadcast_strides = getBroadcastStrides(out, a->m_shape);
+
+  size_t total_elements = sizeFromShape(a->m_shape);
+  std::vector<size_t> coords(a->getRank(), 0);
+
+  for (size_t i = 0; i < total_elements; ++i) {
+    // out's offset will always be 0, since it is a new tensor.
+    // Somewhat of a hack since we use broadcasted strides but we're not
+    // actually broadcasting anything.
+    size_t offset_view =
+        getPhysicalOffset(coords, broadcast_strides, out->m_offset);
+    size_t offset_out = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    (*out->m_data)[offset_view] += (*a->m_data)[offset_out];
+    incrementCoords(coords, a->m_shape);
+  }
+  if (track_creator) {
+    out->m_creator = std::make_unique<ReduceSumOp>(std::vector{a}, out);
+  }
+  // If `keep_dims` is false, performs a squeeze (which also adds an operation
+  // to the graph) so the backward pass of `reduceSum` can assume that any
+  // reduced dimensions are set to 1.
+  if (!keep_dims) {
+    out = squeeze(out, normalizedDims, track_creator);
   }
   return out;
 }

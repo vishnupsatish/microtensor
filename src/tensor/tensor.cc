@@ -48,6 +48,14 @@ Tensor Tensor::permute(const std::vector<size_t>& dims) {
   return Tensor{::permute(m_impl, dims)};
 }
 
+Tensor Tensor::broadcast(const Shape& target) {
+  return Tensor{::broadcast(m_impl, target)};
+}
+
+Tensor Tensor::reduceSum(const std::vector<int>& dims, bool keep_dims) {
+  return Tensor{::reduceSum(m_impl, dims, keep_dims, true)};
+}
+
 void Tensor::backward() { m_impl->backward(); }
 
 void Tensor::dumpTensor(std::ostream& os) { m_impl->dumpTensor(os); }
