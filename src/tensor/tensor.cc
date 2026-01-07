@@ -34,9 +34,19 @@ Tensor Tensor::operator+(const Tensor& other) {
   return Tensor{add(m_impl, other.m_impl)};
 }
 
+Tensor Tensor::operator-(const Tensor& other) {
+  return Tensor{subtract(m_impl, other.m_impl)};
+}
+
 Tensor Tensor::operator*(const Tensor& other) {
   return Tensor{multiply(m_impl, other.m_impl)};
 }
+
+Tensor Tensor::operator/(const Tensor& other) {
+  return Tensor{divide(m_impl, other.m_impl)};
+}
+
+Tensor Tensor::pow(float exp) { return Tensor{::pow(m_impl, exp)}; }
 
 Tensor Tensor::tanh() { return Tensor{::tanh(m_impl)}; }
 
@@ -53,7 +63,7 @@ Tensor Tensor::broadcast(const Shape& target) {
 }
 
 Tensor Tensor::reduceSum(const std::vector<int>& dims, bool keep_dims) {
-  return Tensor{::reduceSum(m_impl, dims, keep_dims, true)};
+  return Tensor{::reduceSum(m_impl, dims, keep_dims)};
 }
 
 void Tensor::backward() { m_impl->backward(); }

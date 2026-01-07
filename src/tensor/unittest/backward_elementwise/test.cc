@@ -80,5 +80,55 @@ int main() {
     a.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 8
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{10.0, 20.0, 30.0, 40.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto res = a - b;
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 9
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{10.0, 20.0, 30.0, 40.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{2.0, 4.0, 5.0, 8.0});
+    auto res = a / b;
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 10
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto res = a.pow(3.0);
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 11: (a + b) / (a * c) - b.pow(2.0)
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{5.0, 6.0, 7.0, 8.0});
+    auto c = Tensor(Shape{1}, std::vector<float>{2.0});
+    auto res = (a + b) / (a * c) - b.pow(2.0);
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 12: (a / b).tanh() + (a - b) * a
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{0.5, 1.0, 1.5, 2.0});
+    auto b = Tensor(Shape{2}, std::vector<float>{1.0, 2.0});
+    auto res = (a / b).tanh() + (a - b) * a;
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }

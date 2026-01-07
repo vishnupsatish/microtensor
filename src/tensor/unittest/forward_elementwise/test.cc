@@ -39,5 +39,41 @@ int main() {
     a.tanh().dumpTensor(std::cout);
   }
 
+  // Test 6
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{5.0, 6.0, 7.0, 8.0});
+    (a - b).dumpTensor(std::cout);
+  }
+
+  // Test 7
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{10.0, 20.0, 30.0, 40.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{2.0, 4.0, 5.0, 8.0});
+    (a / b).dumpTensor(std::cout);
+  }
+
+  // Test 8
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    a.pow(2.0).dumpTensor(std::cout);
+  }
+
+  // Test 9: (a + b) / (a - b)
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{10.0, 20.0, 30.0, 40.0});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto res = (a + b) / (a - b);
+    res.dumpTensor(std::cout);
+  }
+
+  // Test 10: (a * b).pow(2.0) + (a - b).tanh()
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto b = Tensor(Shape{1}, std::vector<float>{0.5});
+    auto res = (a * b).pow(2.0) + (a - b).tanh();
+    res.dumpTensor(std::cout);
+  }
+
   return 0;
 }

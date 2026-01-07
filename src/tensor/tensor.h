@@ -29,7 +29,10 @@ class Tensor {
   Shape getShape() const;
 
   Tensor operator+(const Tensor& other);
+  Tensor operator-(const Tensor& other);
   Tensor operator*(const Tensor& other);
+  Tensor operator/(const Tensor& other);
+  Tensor pow(float exp);
   Tensor tanh();
   Tensor matmul(const Tensor& other);
   Tensor permute(const std::vector<size_t>& dims);

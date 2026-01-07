@@ -104,6 +104,9 @@ void TensorImpl::backward() {
     for (size_t i = 0; i < op->m_parents.size(); ++i) {
       auto input = op->m_parents[i];
       auto calculated_grad = inp_grads[i];
+      // Very inefficient; allocates new memory for m_grad every time
+      // we accumulate gradient. This is very suboptimal. Need to have an
+      // in-place gradient accumulation kernel.
       input->accumulateGrad(calculated_grad);
     }
   }

@@ -65,6 +65,46 @@ def run():
     b7.backward(torch.ones_like(b7))
     results.append(a7.grad.numpy())
 
+    # Test 8
+    a8 = torch.tensor([[10.0, 20.0], [30.0, 40.0]], dtype=torch.float32, requires_grad=True)
+    b8 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    res8 = a8 - b8
+    res8.backward(torch.ones_like(res8))
+    results.append(a8.grad.numpy())
+    results.append(b8.grad.numpy())
+
+    # Test 9
+    a9 = torch.tensor([[10.0, 20.0], [30.0, 40.0]], dtype=torch.float32, requires_grad=True)
+    b9 = torch.tensor([[2.0, 4.0], [5.0, 8.0]], dtype=torch.float32, requires_grad=True)
+    res9 = a9 / b9
+    res9.backward(torch.ones_like(res9))
+    results.append(a9.grad.numpy())
+    results.append(b9.grad.numpy())
+
+    # Test 10
+    a10 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    res10 = torch.pow(a10, 3.0)
+    res10.backward(torch.ones_like(res10))
+    results.append(a10.grad.numpy())
+
+    # Test 11: (a + b) / (a * c) - b.pow(2.0)
+    a11 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    b11 = torch.tensor([[5.0, 6.0], [7.0, 8.0]], dtype=torch.float32, requires_grad=True)
+    c11 = torch.tensor([2.0], dtype=torch.float32, requires_grad=True)
+    res11 = (a11 + b11) / (a11 * c11) - torch.pow(b11, 2.0)
+    res11.backward(torch.ones_like(res11))
+    results.append(a11.grad.numpy())
+    results.append(b11.grad.numpy())
+    results.append(c11.grad.numpy())
+
+    # Test 12: (a / b).tanh() + (a - b) * a
+    a12 = torch.tensor([[0.5, 1.0], [1.5, 2.0]], dtype=torch.float32, requires_grad=True)
+    b12 = torch.tensor([1.0, 2.0], dtype=torch.float32, requires_grad=True)
+    res12 = torch.tanh(a12 / b12) + (a12 - b12) * a12
+    res12.backward(torch.ones_like(res12))
+    results.append(a12.grad.numpy())
+    results.append(b12.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

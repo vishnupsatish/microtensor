@@ -68,6 +68,20 @@ class AddOp : public Operation {
   }
 };
 
+class SubtractOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    // If shapes are not the same, handled by BroadcastOp.
+    assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
+    auto neg_grad =
+        elementwiseUnaryKernel(grad_output, [](float g) { return -g; });
+    return {grad_output, neg_grad};
+  }
+};
+
 class MulOp : public Operation {
  public:
   using Operation::Operation;
@@ -86,6 +100,45 @@ class MulOp : public Operation {
     auto grad_op1 = multiply(grad_output, m_parents[1], false);
     auto grad_op2 = multiply(grad_output, m_parents[0], false);
     return {grad_op1, grad_op2};
+  }
+};
+
+class DivOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
+    // dividing => a/b
+    auto num = m_parents[0];
+    auto denom = m_parents[1];
+    // grad * 1/b
+    auto grad_op1 = multiply(grad_output, divide(1.0f, denom, false), false);
+    // grad * -(a/b^2)
+    auto grad_op2 = multiply(
+        grad_output,
+        elementwiseUnaryKernel(divide(num, pow(denom, 2, false), false),
+                               [](float x) { return -x; }),
+        false);
+    return {grad_op1, grad_op2};
+  }
+};
+
+class PowOp : public Operation {
+  float m_exp;
+
+ public:
+  PowOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+        std::shared_ptr<TensorImpl> output, float exp)
+      : Operation(std::move(parents), output), m_exp(exp) {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto inp = m_parents[0];
+    auto gradS1 = multiply(pow(inp, m_exp - 1, false), m_exp, false);
+    auto gradRes = multiply(grad_output, gradS1, false);
+    return {gradRes};
   }
 };
 
@@ -282,7 +335,6 @@ void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
   size_t total_batches = 1;
   for (size_t i = 0; i < batch_rank; ++i) total_batches *= batch_shape[i];
 
-  // 3. The Main Loop
   for (size_t batch = 0; batch < total_batches; ++batch) {
     size_t offset_a = a->m_offset;
     size_t offset_b = b->m_offset;
@@ -303,7 +355,7 @@ void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
                  b->m_strides[rank - 1], c->m_strides[rank - 2],
                  c->m_strides[rank - 1]);
 
-    incrementCoords(current_coords, batch_shape);  // [0,0] -> [0,1]
+    incrementCoords(current_coords, batch_shape);
   }
 }
 
@@ -336,6 +388,45 @@ std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a,
   return out;
 }
 
+std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a, float cst,
+                                     bool track_creator) {
+  auto b = std::make_shared<TensorImpl>(Shape{}, std::vector<float>{cst});
+  return multiply(a, b, track_creator);
+}
+
+std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a,
+                                   std::shared_ptr<TensorImpl> b,
+                                   bool track_creator) {
+  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::divides<float>());
+  if (track_creator) {
+    out->m_creator = std::make_unique<DivOp>(std::vector{a_bc, b_bc}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a, float denom,
+                                   bool track_creator) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{denom});
+  return divide(a, cst, track_creator);
+}
+
+std::shared_ptr<TensorImpl> divide(float num, std::shared_ptr<TensorImpl> b,
+                                   bool track_creator) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{num});
+  return divide(cst, b, track_creator);
+}
+
+std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp,
+                                bool track_creator) {
+  auto out =
+      elementwiseUnaryKernel(a, [&](float elt) { return std::pow(elt, exp); });
+  if (track_creator) {
+    out->m_creator = std::make_unique<PowOp>(std::vector{a}, out, exp);
+  }
+  return out;
+}
+
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
                                 std::shared_ptr<TensorImpl> b,
                                 bool track_creator) {
@@ -343,6 +434,17 @@ std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
   auto out = elementwiseBinaryKernel(a_bc, b_bc, std::plus<float>());
   if (track_creator) {
     out->m_creator = std::make_unique<AddOp>(std::vector{a_bc, b_bc}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
+                                     std::shared_ptr<TensorImpl> b,
+                                     bool track_creator) {
+  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::minus<float>());
+  if (track_creator) {
+    out->m_creator = std::make_unique<SubtractOp>(std::vector{a_bc, b_bc}, out);
   }
   return out;
 }
@@ -531,9 +633,8 @@ std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
   if (track_creator) {
     out->m_creator = std::make_unique<ReduceSumOp>(std::vector{a}, out);
   }
-  // If `keep_dims` is false, performs a squeeze (which also adds an operation
-  // to the graph) so the backward pass of `reduceSum` can assume that any
-  // reduced dimensions are set to 1.
+  // If `keep_dims` is false, performs a squeeze, so the backward pass of
+  // `reduceSum` can assume that any reduced dimensions are set to 1.
   if (!keep_dims) {
     out = squeeze(out, normalizedDims, track_creator);
   }

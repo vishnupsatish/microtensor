@@ -33,7 +33,6 @@ struct TensorImpl {
   void initializeGrad();
   void accumulateGrad(std::shared_ptr<TensorImpl> new_grad);
 
- public:
   std::unique_ptr<Operation> m_creator;
 
   // Uses default strides for the shape.

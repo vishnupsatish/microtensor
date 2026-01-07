@@ -30,9 +30,29 @@ std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a,
                                      std::shared_ptr<TensorImpl> b,
                                      bool track_creator = true);
 
+std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a, float cst,
+                                     bool track_creator = true);
+
+std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a,
+                                   std::shared_ptr<TensorImpl> b,
+                                   bool track_creator = true);
+
+std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a, float denom,
+                                   bool track_creator = true);
+
+std::shared_ptr<TensorImpl> divide(float num, std::shared_ptr<TensorImpl> b,
+                                   bool track_creator = true);
+
+std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp,
+                                bool track_creator = true);
+
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
                                 std::shared_ptr<TensorImpl> b,
                                 bool track_creator = true);
+
+std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
+                                     std::shared_ptr<TensorImpl> b,
+                                     bool track_creator = true);
 
 std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target,
@@ -59,4 +79,5 @@ std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
                                       std::vector<int> dimInputs,
-                                      bool keep_dims, bool track_creator);
+                                      bool keep_dims,
+                                      bool track_creator = true);
