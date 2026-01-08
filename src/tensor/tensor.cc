@@ -66,6 +66,10 @@ Tensor Tensor::reduceSum(const std::vector<int>& dims, bool keep_dims) {
   return Tensor{::reduceSum(m_impl, dims, keep_dims)};
 }
 
+Tensor Tensor::reduceMax(int dim, bool keep_dim) {
+  return Tensor{::reduceMax(m_impl, dim, keep_dim)};
+}
+
 void Tensor::backward() { m_impl->backward(); }
 
 void Tensor::dumpTensor(std::ostream& os) { m_impl->dumpTensor(os); }

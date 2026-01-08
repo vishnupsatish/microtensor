@@ -136,6 +136,7 @@ class PowOp : public Operation {
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
     auto inp = m_parents[0];
+    // TODO: use elementwiseBinaryKernel for efficiency.
     auto gradS1 = multiply(pow(inp, m_exp - 1, false), m_exp, false);
     auto gradRes = multiply(grad_output, gradS1, false);
     return {gradRes};
@@ -267,6 +268,61 @@ class ReduceSumOp : public Operation {
       std::shared_ptr<TensorImpl> grad_output) override {
     auto input = m_parents[0];
     return {broadcast(grad_output, input->m_shape, false)};
+  }
+};
+
+// Important note: PyTorch implements the backward pass of reduce max in a
+// different way. If there are equal values along a particular dimension, it
+// distributes the gradient equally (and divides by the count) rather than just
+// sending it to the first one like we do here.
+class ReduceMaxOp : public Operation {
+  size_t m_dim;
+  std::shared_ptr<TensorImpl> m_argmax;
+
+ public:
+  ReduceMaxOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+              std::shared_ptr<TensorImpl> output, size_t dim,
+              std::shared_ptr<TensorImpl> argmax)
+      : Operation(std::move(parents), output),
+        m_dim{dim},
+        m_argmax(std::move(argmax)) {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto input = m_parents[0];
+    auto grad = std::make_shared<TensorImpl>(input->m_shape);
+    auto gradStrides = grad->m_strides;
+    size_t reducedStride = gradStrides[m_dim];
+    // Set stride of reduced dim to 0, we will add it later based on the argmax
+    // value (represents the coord).
+    gradStrides[m_dim] = 0;
+    std::vector<size_t> coords(m_argmax->getRank());
+
+    // Idea: argmax contains the "missing coordinate", which represents where
+    // the max item is, and therefore where to place the downstream gradient
+    // value. Loop argmax coordinates, use the value to increment the physical
+    // offset of the calculated offset based on gradStrides. We're just finding
+    // the place where to put the gradient.
+    size_t totalElements = sizeFromShape(m_argmax->m_shape);
+    for (size_t i = 0; i < totalElements; ++i) {
+      size_t argmaxOffset =
+          getPhysicalOffset(coords, m_argmax->m_strides, m_argmax->m_offset);
+      size_t downstreamGradOffset = getPhysicalOffset(
+          coords, grad_output->m_strides, grad_output->m_offset);
+      // Which coord does the max element come from, in the input?
+      size_t reducedCoordVal = (*m_argmax->m_data)[argmaxOffset];
+      // grad: the return value. downstream grad: gradient we get as function
+      // param. downstream grad has the same shape as the reduced value.
+
+      // Determines where the current downstream grad value should go
+      size_t gradOffset =
+          getPhysicalOffset(coords, gradStrides, grad->m_offset) +
+          reducedStride * reducedCoordVal;
+      (*grad->m_data)[gradOffset] =
+          (*grad_output->m_data)[downstreamGradOffset];
+      incrementCoords(coords, m_argmax->m_shape);
+    }
+    return {grad};
   }
 };
 
@@ -637,6 +693,47 @@ std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
   // `reduceSum` can assume that any reduced dimensions are set to 1.
   if (!keep_dims) {
     out = squeeze(out, normalizedDims, track_creator);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
+                                      int dimInput, bool keep_dim,
+                                      bool track_creator) {
+  Shape outShape = a->m_shape;
+  int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
+  outShape[dim] = 1;
+  auto out = std::make_shared<TensorImpl>(outShape);
+  // Used for the backward pass.
+  auto argmax = std::make_shared<TensorImpl>(outShape);
+  std::fill(out->m_data->begin(), out->m_data->end(),
+            -std::numeric_limits<float>::infinity());
+  auto broadcast_strides = getBroadcastStrides(out, a->m_shape);
+
+  size_t total_elements = sizeFromShape(a->m_shape);
+  std::vector<size_t> coords(a->getRank(), 0);
+
+  for (size_t i = 0; i < total_elements; ++i) {
+    // out's offset will always be 0, since it is a new tensor.
+    // Somewhat of a hack since we use broadcasted strides but we're not
+    // actually broadcasting anything.
+    size_t offset_view =
+        getPhysicalOffset(coords, broadcast_strides, out->m_offset);
+    size_t offset_out = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    if ((*a->m_data)[offset_out] > (*out->m_data)[offset_view]) {
+      (*out->m_data)[offset_view] = (*a->m_data)[offset_out];
+      // Coordinate of the max value (the one that gets sent to the particular
+      // location).
+      (*argmax->m_data)[offset_view] = coords[dim];
+    }
+    incrementCoords(coords, a->m_shape);
+  }
+  if (track_creator) {
+    out->m_creator =
+        std::make_unique<ReduceMaxOp>(std::vector{a}, out, dim, argmax);
+  }
+  if (!keep_dim) {
+    out = squeeze(out, {dim}, track_creator);
   }
   return out;
 }

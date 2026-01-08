@@ -172,6 +172,7 @@ void TensorImpl::dumpTensor(std::ostream& os) {
 
 size_t getPhysicalOffset(const std::vector<size_t>& coords,
                          const std::vector<size_t>& strides, size_t offset) {
+  assert(coords.size() == strides.size());
   // inefficient.
   size_t out = offset;
   for (size_t i = 0; i < coords.size(); ++i) {

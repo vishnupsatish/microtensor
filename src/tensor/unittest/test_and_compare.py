@@ -36,6 +36,11 @@ def run_test(cpp_executable, py_reference):
     # 1. Run C++ and capture stdout
     print(f"Running C++: {cpp_executable}...")
     cpp_proc = subprocess.run([cpp_executable], capture_output=True, text=True)
+    
+    # Dump C++ stderr if it exists
+    if cpp_proc.stderr:
+        print(cpp_proc.stderr, file=sys.stderr, end="")
+
     if cpp_proc.returncode != 0:
         print(f"C++ Crashed:\n{cpp_proc.stderr}")
         return False

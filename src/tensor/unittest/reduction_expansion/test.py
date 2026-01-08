@@ -65,6 +65,48 @@ def run():
     c12.backward()
     results.append(a12.grad.numpy())
 
+    # Test 13
+    a13 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32)
+    results.append(torch.max(a13, dim=0, keepdim=False).values.numpy())
+
+    # Test 14
+    a14 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32)
+    results.append(torch.max(a14, dim=1, keepdim=True).values.numpy())
+
+    # Test 15
+    a15 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32, requires_grad=True)
+    b15 = torch.max(a15, dim=0, keepdim=False).values
+    b15.backward(torch.ones_like(b15))
+    results.append(a15.grad.numpy())
+
+    # Test 16
+    a16 = torch.tensor([[1, 2], [7, 4], [5, 8]], dtype=torch.float32, requires_grad=True)
+    b16 = torch.max(a16, dim=0, keepdim=False).values
+    b16.backward(torch.ones_like(b16))
+    results.append(a16.grad.numpy())
+
+    # Test 17: Forward reduceMax with tied maximum values
+    a17 = torch.tensor([[5, 2], [5, 4], [1, 4]], dtype=torch.float32)
+    results.append(torch.max(a17, dim=0, keepdim=False).values.numpy())
+
+    # Test 18: (a + b).reduceMax(0) * c
+    a18 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
+    b18 = torch.tensor([[10, 20], [30, 40]], dtype=torch.float32, requires_grad=True)
+    c18 = torch.tensor([0.5, 0.5], dtype=torch.float32, requires_grad=True)
+    res18 = torch.max(a18 + b18, dim=0, keepdim=False).values * c18
+    res18.backward(torch.ones_like(res18))
+    results.append(a18.grad.numpy())
+    results.append(b18.grad.numpy())
+    results.append(c18.grad.numpy())
+
+    # Test 19: (a.reduceMax(1) - b).pow(2.0)
+    a19 = torch.tensor([[1, 5], [6, 3], [2, 4]], dtype=torch.float32, requires_grad=True)
+    b19 = torch.tensor([1, 1, 1], dtype=torch.float32, requires_grad=True)
+    res19 = torch.pow(torch.max(a19, dim=1, keepdim=False).values - b19, 2.0)
+    res19.backward(torch.ones_like(res19))
+    results.append(a19.grad.numpy())
+    results.append(b19.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

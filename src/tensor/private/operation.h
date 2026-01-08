@@ -81,3 +81,7 @@ std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
                                       std::vector<int> dimInputs,
                                       bool keep_dims,
                                       bool track_creator = true);
+
+std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
+                                      int dimInput, bool keep_dim,
+                                      bool track_creator = true);

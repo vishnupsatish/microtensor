@@ -38,6 +38,7 @@ class Tensor {
   Tensor permute(const std::vector<size_t>& dims);
   Tensor broadcast(const Shape& target);
   Tensor reduceSum(const std::vector<int>& dims, bool keep_dims = false);
+  Tensor reduceMax(int dim, bool keep_dim = false);
 
   void backward();
 };

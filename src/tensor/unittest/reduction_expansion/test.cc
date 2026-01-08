@@ -89,5 +89,61 @@ int main() {
     a.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 13
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 6, 3, 4, 5, 2});
+    a.reduceMax(0, false).dumpTensor(std::cout);
+  }
+
+  // Test 14
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 6, 3, 4, 5, 2});
+    a.reduceMax(1, true).dumpTensor(std::cout);
+  }
+
+  // Test 15
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 6, 3, 4, 5, 2});
+    auto b = a.reduceMax(0, false);
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 16
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 2, 7, 4, 5, 8});
+    auto b = a.reduceMax(0, false);
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 17
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{5, 2, 5, 4, 1, 4});
+    a.reduceMax(0, false).dumpTensor(std::cout);
+  }
+
+  // Test 18
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1, 2, 3, 4});
+    auto b = Tensor(Shape{2, 2}, std::vector<float>{10, 20, 30, 40});
+    auto c = Tensor(Shape{2}, std::vector<float>{0.5, 0.5});
+    auto res = (a + b).reduceMax(0, false) * c;
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+    c.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 19
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 5, 6, 3, 2, 4});
+    auto b = Tensor(Shape{3}, std::vector<float>{1, 1, 1});
+    auto res = (a.reduceMax(1, false) - b).pow(2.0);
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }
