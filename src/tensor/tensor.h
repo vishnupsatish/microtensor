@@ -39,6 +39,8 @@ class Tensor {
   Tensor broadcast(const Shape& target);
   Tensor reduceSum(const std::vector<int>& dims, bool keep_dims = false);
   Tensor reduceMax(int dim, bool keep_dim = false);
+  Tensor reshape(const Shape& shape);
+  Tensor makeContiguous();
 
   void backward();
 };

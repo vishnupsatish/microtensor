@@ -70,6 +70,12 @@ Tensor Tensor::reduceMax(int dim, bool keep_dim) {
   return Tensor{::reduceMax(m_impl, dim, keep_dim)};
 }
 
+Tensor Tensor::reshape(const Shape& shape) {
+  return Tensor{::reshape(m_impl, shape)};
+}
+
+Tensor Tensor::makeContiguous() { return Tensor{::makeContiguous(m_impl)}; }
+
 void Tensor::backward() { m_impl->backward(); }
 
 void Tensor::dumpTensor(std::ostream& os) { m_impl->dumpTensor(os); }

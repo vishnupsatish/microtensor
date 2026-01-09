@@ -107,6 +107,33 @@ def run():
     results.append(a19.grad.numpy())
     results.append(b19.grad.numpy())
 
+    # Test 20: reshape
+    a20 = torch.tensor([1, 2, 3, 4, 5, 6], dtype=torch.float32)
+    results.append(torch.reshape(a20, (2, 3)).numpy())
+
+    # Test 21: reshape backward
+    a21 = torch.tensor([1, 2, 3, 4, 5, 6], dtype=torch.float32, requires_grad=True)
+    b21 = torch.reshape(a21, (3, 2))
+    b21.backward(torch.ones_like(b21))
+    results.append(a21.grad.numpy())
+
+    # Test 22: contiguous after permute
+    a22 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+    b22 = a22.permute(1, 0).contiguous()
+    results.append(b22.numpy())
+
+    # Test 23: contiguous after broadcast
+    a23 = torch.tensor([1, 2, 3], dtype=torch.float32)
+    b23 = torch.broadcast_to(a23, (2, 3)).contiguous()
+    results.append(b23.numpy())
+
+    # Test 24: reshape on non-contiguous tensor
+    a24 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32, requires_grad=True)
+    b24 = a24.permute(1, 0) # Shape (3, 2)
+    c24 = torch.reshape(b24, (6,))
+    c24.backward(torch.ones_like(c24))
+    results.append(a24.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

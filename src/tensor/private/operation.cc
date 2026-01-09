@@ -274,7 +274,9 @@ class ReduceSumOp : public Operation {
 // Important note: PyTorch implements the backward pass of reduce max in a
 // different way. If there are equal values along a particular dimension, it
 // distributes the gradient equally (and divides by the count) rather than just
-// sending it to the first one like we do here.
+// sending it to the first one like we do here. Therefore, when differential
+// testing, we cannot test the backward pass against PyTorch if there are
+// several values that are the same in the dimension that is being reduced.
 class ReduceMaxOp : public Operation {
   size_t m_dim;
   std::shared_ptr<TensorImpl> m_argmax;
@@ -323,6 +325,27 @@ class ReduceMaxOp : public Operation {
       incrementCoords(coords, m_argmax->m_shape);
     }
     return {grad};
+  }
+};
+
+class MakeContiguousOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    return {grad_output};
+  }
+};
+
+class ReshapeOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto ret = reshape(grad_output, m_parents[0]->m_shape, false);
+    return {ret};
   }
 };
 
@@ -734,6 +757,39 @@ std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
   }
   if (!keep_dim) {
     out = squeeze(out, {dim}, track_creator);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a,
+                                           bool track_creator) {
+  if (a->isContiguous()) {
+    return a;
+  }
+  size_t total_elements = sizeFromShape(a->m_shape);
+  std::vector<size_t> coords(a->m_shape.size(), 0);
+  std::vector<float> newData(total_elements);
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset_a = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    newData[i] = (*a->m_data)[offset_a];
+    incrementCoords(coords, a->m_shape);
+  }
+  // contiguous, so ctor will calculate default strides.
+  auto out = std::make_shared<TensorImpl>(a->m_shape, newData);
+  if (track_creator) {
+    out->m_creator = std::make_unique<MakeContiguousOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
+                                    Shape newShape, bool track_creator) {
+  // TODO: verify newShape.
+  auto a_cont = makeContiguous(a);
+  auto out = std::make_shared<TensorImpl>(
+      newShape, defaultStridesFromShape(newShape), a_cont->m_data);
+  if (track_creator) {
+    out->m_creator = std::make_unique<ReshapeOp>(std::vector{a_cont}, out);
   }
   return out;
 }

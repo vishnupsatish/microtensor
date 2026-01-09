@@ -47,6 +47,9 @@ struct TensorImpl {
 
   std::shared_ptr<TensorImpl> getGrad() const;
   size_t getRank() const;
+  // Note: if there is pressure on this function in the future, it can be cached
+  // and changed when the strides/shape change of this tensor.
+  bool isContiguous() const;
 
   void backward();
 };

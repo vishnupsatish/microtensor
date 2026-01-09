@@ -52,6 +52,17 @@ std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
 size_t TensorImpl::getRank() const { return m_shape.size(); }
 
+bool TensorImpl::isContiguous() const {
+  long long acc = 1;
+  for (int i = getRank() - 1; i >= 0; --i) {
+    if (m_strides[i] != acc) {
+      return false;
+    }
+    acc *= m_shape[i];
+  }
+  return true;
+}
+
 void TensorImpl::fillRandom() {
   float mn = 0;
   float mx = 10;

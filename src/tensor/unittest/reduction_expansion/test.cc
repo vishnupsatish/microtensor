@@ -145,5 +145,42 @@ int main() {
     b.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 20
+  {
+    auto a = Tensor(Shape{6}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    a.reshape(Shape{2, 3}).dumpTensor(std::cout);
+  }
+
+  // Test 21
+  {
+    auto a = Tensor(Shape{6}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto b = a.reshape(Shape{3, 2});
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 22
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto b = a.permute({1, 0});  // Shape {3, 2}, non-contiguous
+    b.makeContiguous().dumpTensor(std::cout);
+  }
+
+  // Test 23
+  {
+    auto a = Tensor(Shape{3}, std::vector<float>{1, 2, 3});
+    auto b = a.broadcast(Shape{2, 3});  // non-contiguous
+    b.makeContiguous().dumpTensor(std::cout);
+  }
+
+  // Test 24
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto b = a.permute({1, 0});    // Shape {3, 2}, non-contiguous
+    auto c = b.reshape(Shape{6});  // Should call makeContiguous internally
+    c.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }
