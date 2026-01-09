@@ -87,7 +87,7 @@ def run():
     res10.backward(torch.ones_like(res10))
     results.append(a10.grad.numpy())
 
-    # Test 11: (a + b) / (a * c) - b.pow(2.0)
+    # Test 11
     a11 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
     b11 = torch.tensor([[5.0, 6.0], [7.0, 8.0]], dtype=torch.float32, requires_grad=True)
     c11 = torch.tensor([2.0], dtype=torch.float32, requires_grad=True)
@@ -97,13 +97,33 @@ def run():
     results.append(b11.grad.numpy())
     results.append(c11.grad.numpy())
 
-    # Test 12: (a / b).tanh() + (a - b) * a
+    # Test 12
     a12 = torch.tensor([[0.5, 1.0], [1.5, 2.0]], dtype=torch.float32, requires_grad=True)
     b12 = torch.tensor([1.0, 2.0], dtype=torch.float32, requires_grad=True)
     res12 = torch.tanh(a12 / b12) + (a12 - b12) * a12
     res12.backward(torch.ones_like(res12))
     results.append(a12.grad.numpy())
     results.append(b12.grad.numpy())
+
+    # Test 13
+    a13 = torch.tensor([[0.5, 1.0], [1.5, 2.0]], dtype=torch.float32, requires_grad=True)
+    res13 = torch.exp(a13)
+    res13.backward(torch.ones_like(res13))
+    results.append(a13.grad.numpy())
+
+    # Test 14
+    a14 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    res14 = torch.log(a14)
+    res14.backward(torch.ones_like(res14))
+    results.append(a14.grad.numpy())
+
+    # Test 15
+    a15 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    b15 = torch.tensor([1.0, 2.0], dtype=torch.float32, requires_grad=True)
+    res15 = torch.exp(a15 / b15) + torch.log(a15 * b15)
+    res15.backward(torch.ones_like(res15))
+    results.append(a15.grad.numpy())
+    results.append(b15.grad.numpy())
 
     return results
 

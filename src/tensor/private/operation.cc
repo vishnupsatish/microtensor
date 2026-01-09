@@ -157,6 +157,31 @@ class TanhOp : public Operation {
   }
 };
 
+class ExpOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    // TODO: is it ever possible for this to fail?
+    // Don't recalculate e^x again.
+    auto out = m_output.lock();
+    auto ret = multiply(out, grad_output, false);
+    return {ret};
+  }
+};
+
+class LogOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto inp = m_parents[0];
+    return {divide(grad_output, inp, false)};
+  }
+};
+
 class BroadcastOp : public Operation {
  public:
   using Operation::Operation;
@@ -349,6 +374,46 @@ class ReshapeOp : public Operation {
   }
 };
 
+class SliceOp : public Operation {
+  std::vector<int> m_start;
+  Shape m_size;
+
+ public:
+  SliceOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+          std::shared_ptr<TensorImpl> output, std::vector<int> start,
+          Shape size)
+      : Operation(std::move(parents), output),
+        m_start{std::move(start)},
+        m_size(std::move(size)) {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    auto input = m_parents[0];
+    Shape& inputShape = input->m_shape;
+    auto ret = std::make_shared<TensorImpl>(inputShape);
+    std::fill(ret->m_data->begin(), ret->m_data->end(), 0.0f);
+    // will/should be 0
+    size_t offset = ret->m_offset;
+    for (size_t i = 0; i < m_start.size(); ++i) {
+      offset += m_start[i] * ret->m_strides[i];
+    }
+    assert(m_size == grad_output->m_shape);
+    // We've artifically created a "view" of ret that includes only the sliced
+    // part; just consider offset, ret's strides, and m_size as the shape.
+    size_t totalElements = sizeFromShape(m_size);
+    std::vector<size_t> coords(input->getRank());
+    for (size_t i = 0; i < totalElements; ++i) {
+      auto gradOffset = getPhysicalOffset(coords, grad_output->m_strides,
+                                          grad_output->m_offset);
+      // Where to place the current gradient value
+      auto retOffset = getPhysicalOffset(coords, ret->m_strides, offset);
+      (*ret->m_data)[retOffset] = (*grad_output->m_data)[gradOffset];
+      incrementCoords(coords, m_size);
+    }
+    return {ret};
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // Helper to align two tensors to a common broadcasted shape.
@@ -537,6 +602,24 @@ std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
   return out;
 }
 
+std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a,
+                                bool track_creator) {
+  auto out = elementwiseUnaryKernel(a, std::exp<float>);
+  if (track_creator) {
+    out->m_creator = std::make_unique<ExpOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a,
+                                bool track_creator) {
+  auto out = elementwiseUnaryKernel(a, std::log<float>);
+  if (track_creator) {
+    out->m_creator = std::make_unique<LogOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
 std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
                                       const Shape& target, bool track_creator) {
   // Assumes broadcastable, not intended to be a user-facing function for now.
@@ -670,6 +753,7 @@ std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
     newStrides[i] = a->m_strides[dims[i]];
   }
   auto out = std::make_shared<TensorImpl>(newShape, newStrides, a->m_data);
+  out->m_offset = a->m_offset;
   if (track_creator) {
     out->m_creator = std::make_unique<PermuteOp>(std::vector{a}, out, dims);
   }
@@ -785,11 +869,35 @@ std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
                                     Shape newShape, bool track_creator) {
   // TODO: verify newShape.
+  // Note: we use a weaker condition in terms of when a reshape view is
+  // possible. Need to understand the stronger condition and potentially use it
+  // in the future, so we don't unnecessarily make contiguous.
   auto a_cont = makeContiguous(a);
   auto out = std::make_shared<TensorImpl>(
       newShape, defaultStridesFromShape(newShape), a_cont->m_data);
   if (track_creator) {
     out->m_creator = std::make_unique<ReshapeOp>(std::vector{a_cont}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
+                                  std::vector<int> start, Shape size,
+                                  bool track_creator) {
+  if (start.size() != size.size() || start.size() != a->getRank()) {
+    throw std::runtime_error(
+        "Invalid start/size lists, must be equal to rank of input");
+  }
+  // Calculate offset
+  size_t newOffset = a->m_offset;
+  for (size_t i = 0; i < a->getRank(); ++i) {
+    newOffset += start[i] * a->m_strides[i];
+  }
+  auto out = std::make_shared<TensorImpl>(size, a->m_strides, a->m_data);
+  out->m_offset = newOffset;
+  if (track_creator) {
+    out->m_creator = std::make_unique<SliceOp>(
+        std::vector{a}, out, std::move(start), std::move(size));
   }
   return out;
 }

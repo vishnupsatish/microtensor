@@ -50,6 +50,10 @@ Tensor Tensor::pow(float exp) { return Tensor{::pow(m_impl, exp)}; }
 
 Tensor Tensor::tanh() { return Tensor{::tanh(m_impl)}; }
 
+Tensor Tensor::exp() { return Tensor{::exp(m_impl)}; }
+
+Tensor Tensor::log() { return Tensor{::log(m_impl)}; }
+
 Tensor Tensor::matmul(const Tensor& other) {
   return Tensor{::matmul(m_impl, other.m_impl)};
 }
@@ -75,6 +79,10 @@ Tensor Tensor::reshape(const Shape& shape) {
 }
 
 Tensor Tensor::makeContiguous() { return Tensor{::makeContiguous(m_impl)}; }
+
+Tensor Tensor::slice(const std::vector<int>& start, const Shape& size) {
+  return Tensor{::slice(m_impl, start, size)};
+}
 
 void Tensor::backward() { m_impl->backward(); }
 

@@ -44,15 +44,28 @@ def run():
     a8 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
     results.append(torch.pow(a8, 2.0).detach().numpy())
 
-    # Test 9: (a + b) / (a - b)
+    # Test 9
     a9 = torch.tensor([[10.0, 20.0], [30.0, 40.0]], dtype=torch.float32)
     b9 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
     results.append(((a9 + b9) / (a9 - b9)).detach().numpy())
 
-    # Test 10: (a * b).pow(2.0) + (a - b).tanh()
+    # Test 10
     a10 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
     b10 = torch.tensor([0.5], dtype=torch.float32)
     results.append((torch.pow(a10 * b10, 2.0) + torch.tanh(a10 - b10)).detach().numpy())
+
+    # Test 11
+    a11 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+    results.append(torch.exp(a11).detach().numpy())
+
+    # Test 12
+    a12 = torch.tensor([[1.0, 2.7182818], [7.389056, 20.085537]], dtype=torch.float32)
+    results.append(torch.log(a12).detach().numpy())
+
+    # Test 13
+    a13 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+    b13 = torch.tensor([[2.0, 3.0], [4.0, 5.0]], dtype=torch.float32)
+    results.append((torch.exp(a13) * torch.log(b13) - torch.pow(a13, 0.5)).detach().numpy())
 
     return results
 

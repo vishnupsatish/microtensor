@@ -34,6 +34,8 @@ class Tensor {
   Tensor operator/(const Tensor& other);
   Tensor pow(float exp);
   Tensor tanh();
+  Tensor exp();
+  Tensor log();
   Tensor matmul(const Tensor& other);
   Tensor permute(const std::vector<size_t>& dims);
   Tensor broadcast(const Shape& target);
@@ -41,6 +43,7 @@ class Tensor {
   Tensor reduceMax(int dim, bool keep_dim = false);
   Tensor reshape(const Shape& shape);
   Tensor makeContiguous();
+  Tensor slice(const std::vector<int>& start, const Shape& size);
 
   void backward();
 };

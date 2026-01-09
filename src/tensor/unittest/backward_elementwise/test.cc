@@ -108,7 +108,7 @@ int main() {
     a.getGrad().dumpTensor(std::cout);
   }
 
-  // Test 11: (a + b) / (a * c) - b.pow(2.0)
+  // Test 11
   {
     auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
     auto b = Tensor(Shape{2, 2}, std::vector<float>{5.0, 6.0, 7.0, 8.0});
@@ -120,11 +120,37 @@ int main() {
     c.getGrad().dumpTensor(std::cout);
   }
 
-  // Test 12: (a / b).tanh() + (a - b) * a
+  // Test 12
   {
     auto a = Tensor(Shape{2, 2}, std::vector<float>{0.5, 1.0, 1.5, 2.0});
     auto b = Tensor(Shape{2}, std::vector<float>{1.0, 2.0});
     auto res = (a / b).tanh() + (a - b) * a;
+    res.backward();
+    a.getGrad().dumpTensor(std::cout);
+    b.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 13
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{0.5, 1.0, 1.5, 2.0});
+    auto b = a.exp();
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 14
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto b = a.log();
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 15
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1.0, 2.0, 3.0, 4.0});
+    auto b = Tensor(Shape{2}, std::vector<float>{1.0, 2.0});
+    auto res = (a / b).exp() + (a * b).log();
     res.backward();
     a.getGrad().dumpTensor(std::cout);
     b.getGrad().dumpTensor(std::cout);

@@ -69,11 +69,19 @@ std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
                                  bool track_creator = true);
 
+std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a,
+                                bool track_creator = true);
+
+std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a,
+                                bool track_creator = true);
+
 std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
                                    std::shared_ptr<TensorImpl> b,
                                    bool track_creator = true);
 
 std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
+                                    // TODO: change to int, should not be using
+                                    // size_t in outside-facing API probably
                                     std::vector<size_t> dims,
                                     bool track_creator = true);
 
@@ -91,3 +99,7 @@ std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
                                     Shape newShape, bool track_creator = true);
+
+std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
+                                  std::vector<int> start, Shape size,
+                                  bool track_creator = true);
