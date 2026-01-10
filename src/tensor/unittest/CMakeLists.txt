@@ -22,6 +22,10 @@ add_executable(slice_reshapes_exe slice_reshapes/test.cc)
 target_link_libraries(slice_reshapes_exe Tensor)
 target_include_directories(slice_reshapes_exe PRIVATE ..)
 
+add_executable(backward_logic_exe backward_logic/test.cc)
+target_link_libraries(backward_logic_exe Tensor)
+target_include_directories(backward_logic_exe PRIVATE ..)
+
 # Force CMake to look for the virtual environment first
 set(Python3_FIND_VIRTUALENV ONLY)
 set(Python3_ROOT_DIR "${CMAKE_SOURCE_DIR}/../venv")
@@ -67,4 +71,10 @@ add_test(NAME slice_reshapes_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_and_compare.py 
             $<TARGET_FILE:slice_reshapes_exe> 
             ${CMAKE_CURRENT_SOURCE_DIR}/slice_reshapes/test.py
+)
+
+add_test(NAME backward_logic_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_and_compare.py 
+            $<TARGET_FILE:backward_logic_exe> 
+            ${CMAKE_CURRENT_SOURCE_DIR}/backward_logic/test.py
 )

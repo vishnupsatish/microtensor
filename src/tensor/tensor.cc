@@ -12,15 +12,18 @@
 #include "private/operation.h"
 #include "private/tensor_impl.h"
 
-Tensor::Tensor(const Shape& shape)
-    : m_impl{std::make_shared<TensorImpl>(shape)} {}
+Tensor::Tensor(const Shape& shape, bool requiresGrad)
+    : m_impl{std::make_shared<TensorImpl>(shape, requiresGrad)} {}
 
 Tensor::Tensor(const Tensor& other) : m_impl{other.m_impl} {}
 
 Tensor::Tensor(std::shared_ptr<TensorImpl> otherImpl) : m_impl{otherImpl} {}
 
-Tensor::Tensor(const Shape& shape, const std::vector<float>& data)
-    : m_impl{std::make_shared<TensorImpl>(shape, data)} {}
+Tensor::Tensor(const Shape& shape, const std::vector<float>& data,
+               bool requiresGrad)
+    : m_impl{std::make_shared<TensorImpl>(shape, data, requiresGrad)} {}
+
+bool Tensor::isValid() const { return m_impl != nullptr; }
 
 void Tensor::fillRandom() { m_impl->fillRandom(); }
 

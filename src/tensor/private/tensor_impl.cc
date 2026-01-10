@@ -15,9 +15,9 @@
 #include <set>
 #include <vector>
 
+#include "grad_mode.h"
 #include "operation.h"
 #include "shape.h"
-
 namespace {
 
 void buildTopo(Operation* op, std::set<Operation*>& visited,
@@ -34,19 +34,25 @@ void buildTopo(Operation* op, std::set<Operation*>& visited,
 
 }  // namespace
 
-TensorImpl::TensorImpl(const Shape& shape)
+TensorImpl::TensorImpl(const Shape& shape, bool requiresGrad)
     : m_shape{shape},
       m_data{std::make_shared<Storage>(sizeFromShape(shape))},
-      m_strides(defaultStridesFromShape(shape)) {}
+      m_strides(defaultStridesFromShape(shape)),
+      m_requiresGrad{requiresGrad} {}
 
 TensorImpl::TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
-                       std::shared_ptr<Storage> data)
-    : m_shape{shape}, m_data{data}, m_strides{strides} {}
+                       std::shared_ptr<Storage> data, bool requiresGrad)
+    : m_shape{shape},
+      m_data{data},
+      m_strides{strides},
+      m_requiresGrad{requiresGrad} {}
 
-TensorImpl::TensorImpl(const Shape& shape, const std::vector<float>& data)
+TensorImpl::TensorImpl(const Shape& shape, const std::vector<float>& data,
+                       bool requiresGrad)
     : m_shape{shape},
       m_data{std::make_shared<Storage>(data)},
-      m_strides(defaultStridesFromShape(shape)) {}
+      m_strides(defaultStridesFromShape(shape)),
+      m_requiresGrad{requiresGrad} {}
 
 std::shared_ptr<TensorImpl> TensorImpl::getGrad() const { return m_grad; }
 
@@ -89,12 +95,19 @@ void TensorImpl::accumulateGrad(std::shared_ptr<TensorImpl> new_grad) {
   if (!m_grad) {
     m_grad = new_grad;
   } else {
-    // Disable tracking creator.
-    m_grad = add(m_grad, new_grad, false);
+    m_grad = add(m_grad, new_grad);
   }
 }
 
 void TensorImpl::backward() {
+  // IMPORTANT: do not track creator/gradients as a result of any operations
+  // performed in this method.
+  NoGrad guard;
+
+  if (!m_requiresGrad) {
+    return;
+  }
+
   if (!m_grad) {
     initializeGrad();
   }
@@ -110,10 +123,18 @@ void TensorImpl::backward() {
 
   for (auto op : topo_order) {
     std::shared_ptr<TensorImpl> outTensor = op->m_output.lock();
+    if (!outTensor->m_requiresGrad) {
+      continue;
+    }
     auto inp_grads = op->backward(outTensor->m_grad);
     assert(inp_grads.size() == op->m_parents.size());
     for (size_t i = 0; i < op->m_parents.size(); ++i) {
       auto input = op->m_parents[i];
+
+      if (!input->m_requiresGrad) {
+        continue;
+      }
+
       auto calculated_grad = inp_grads[i];
       // Very inefficient; allocates new memory for m_grad every time
       // we accumulate gradient. This is very suboptimal. Need to have an

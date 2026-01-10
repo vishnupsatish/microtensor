@@ -17,11 +17,13 @@ class Tensor {
   std::shared_ptr<TensorImpl> m_impl;
 
  public:
-  Tensor(const Shape& shape);
+  Tensor(const Shape& shape, bool requiresGrad = false);
   Tensor(const Tensor& other);
   Tensor(std::shared_ptr<TensorImpl> otherImpl);
-  Tensor(const Shape& shape, const std::vector<float>& data);
+  Tensor(const Shape& shape, const std::vector<float>& data,
+         bool requiresGrad = false);
 
+  bool isValid() const;
   void fillRandom();
   void print(std::ostream& os);
   void dumpTensor(std::ostream& os);

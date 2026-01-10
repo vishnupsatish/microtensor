@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 
+#include "grad_mode.h"
 #include "shape.h"
 #include "tensor_impl.h"
 
@@ -62,6 +63,7 @@ class AddOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // If shapes are not the same, handled by BroadcastOp.
     assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
     return {grad_output, grad_output};
@@ -74,6 +76,7 @@ class SubtractOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // If shapes are not the same, handled by BroadcastOp.
     assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
     auto neg_grad =
@@ -97,8 +100,9 @@ class MulOp : public Operation {
     // grad_a is owned by a. This forms a cycle, which is a -> grad_a -> c -> a,
     // and thus will cause a memory leak. Certain ML algorithms require
     // double-backprop, so we'll implement if/when that time comes.
-    auto grad_op1 = multiply(grad_output, m_parents[1], false);
-    auto grad_op2 = multiply(grad_output, m_parents[0], false);
+    NoGrad guard;
+    auto grad_op1 = multiply(grad_output, m_parents[1]);
+    auto grad_op2 = multiply(grad_output, m_parents[0]);
     return {grad_op1, grad_op2};
   }
 };
@@ -109,18 +113,17 @@ class DivOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
     // dividing => a/b
     auto num = m_parents[0];
     auto denom = m_parents[1];
     // grad * 1/b
-    auto grad_op1 = multiply(grad_output, divide(1.0f, denom, false), false);
+    auto grad_op1 = multiply(grad_output, divide(1.0f, denom));
     // grad * -(a/b^2)
     auto grad_op2 = multiply(
-        grad_output,
-        elementwiseUnaryKernel(divide(num, pow(denom, 2, false), false),
-                               [](float x) { return -x; }),
-        false);
+        grad_output, elementwiseUnaryKernel(divide(num, pow(denom, 2)),
+                                            [](float x) { return -x; }));
     return {grad_op1, grad_op2};
   }
 };
@@ -135,10 +138,11 @@ class PowOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     auto inp = m_parents[0];
     // TODO: use elementwiseBinaryKernel for efficiency.
-    auto gradS1 = multiply(pow(inp, m_exp - 1, false), m_exp, false);
-    auto gradRes = multiply(grad_output, gradS1, false);
+    auto gradS1 = multiply(pow(inp, m_exp - 1), m_exp);
+    auto gradRes = multiply(grad_output, gradS1);
     return {gradRes};
   }
 };
@@ -149,6 +153,7 @@ class TanhOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // TODO: is it ever possible for this to fail?
     auto out = m_output.lock();
     // grad_input = grad_output * (1 - out^2)
@@ -163,10 +168,11 @@ class ExpOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // TODO: is it ever possible for this to fail?
     // Don't recalculate e^x again.
     auto out = m_output.lock();
-    auto ret = multiply(out, grad_output, false);
+    auto ret = multiply(out, grad_output);
     return {ret};
   }
 };
@@ -177,8 +183,9 @@ class LogOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     auto inp = m_parents[0];
-    return {divide(grad_output, inp, false)};
+    return {divide(grad_output, inp)};
   }
 };
 
@@ -188,6 +195,7 @@ class BroadcastOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // For any prepended dims, we need to reduce and not keep dims. For
     // non-prepended dims that were broadcasted, reduce and keep dims.
     auto input = m_parents[0];
@@ -196,14 +204,14 @@ class BroadcastOp : public Operation {
     for (int i = 0; i < diff; ++i) {
       prependedDims.push_back(i);
     }
-    auto rmPrepended = reduceSum(grad_output, prependedDims, false, false);
+    auto rmPrepended = reduceSum(grad_output, prependedDims, false);
     std::vector<int> dimsToReduce;
     for (size_t i = 0; i < input->getRank(); ++i) {
       if (input->m_shape[i] == 1 && rmPrepended->m_shape[i] > 1) {
         dimsToReduce.push_back(i);
       }
     }
-    auto grad_input = reduceSum(rmPrepended, dimsToReduce, true, false);
+    auto grad_input = reduceSum(rmPrepended, dimsToReduce, true);
     return {grad_input};
   }
 };
@@ -217,8 +225,10 @@ class SqueezeOp : public Operation {
       : Operation(std::move(parents), output), m_dims(std::move(dims)) {}
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
+
       std::shared_ptr<TensorImpl> grad_output) override {
-    auto grad_input = unsqueeze(grad_output, m_dims, false);
+    NoGrad guard;
+    auto grad_input = unsqueeze(grad_output, m_dims);
     return {grad_input};
   }
 };
@@ -233,7 +243,8 @@ class UnsqueezeOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    auto grad_input = squeeze(grad_output, m_dims, false);
+    NoGrad guard;
+    auto grad_input = squeeze(grad_output, m_dims);
     return {grad_input};
   }
 };
@@ -243,6 +254,7 @@ class MatmulOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     // Invariant: inputs are matmul-compatible without the need for any
     // broadcasting/squeezing/unsqueezing.
     size_t rank = grad_output->getRank();
@@ -258,10 +270,10 @@ class MatmulOp : public Operation {
     }
     permuteDims.push_back(rank - 1);
     permuteDims.push_back(rank - 2);
-    auto aTranspose = permute(a, permuteDims, false);
-    auto bTranspose = permute(b, permuteDims, false);
-    auto dA = matmul(grad_output, bTranspose, false);
-    auto dB = matmul(aTranspose, grad_output, false);
+    auto aTranspose = permute(a, permuteDims);
+    auto bTranspose = permute(b, permuteDims);
+    auto dA = matmul(grad_output, bTranspose);
+    auto dB = matmul(aTranspose, grad_output);
     return {dA, dB};
   }
 };
@@ -276,11 +288,12 @@ class PermuteOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     std::vector<size_t> reverseDims(m_dims.size());
     for (size_t i = 0; i < m_dims.size(); ++i) {
       reverseDims[m_dims[i]] = i;
     }
-    auto grad_input = permute(grad_output, reverseDims, false);
+    auto grad_input = permute(grad_output, reverseDims);
     return {grad_input};
   }
 };
@@ -291,8 +304,9 @@ class ReduceSumOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     auto input = m_parents[0];
-    return {broadcast(grad_output, input->m_shape, false)};
+    return {broadcast(grad_output, input->m_shape)};
   }
 };
 
@@ -316,6 +330,7 @@ class ReduceMaxOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     auto input = m_parents[0];
     auto grad = std::make_shared<TensorImpl>(input->m_shape);
     auto gradStrides = grad->m_strides;
@@ -359,6 +374,7 @@ class MakeContiguousOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     return {grad_output};
   }
 };
@@ -369,7 +385,8 @@ class ReshapeOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
-    auto ret = reshape(grad_output, m_parents[0]->m_shape, false);
+    NoGrad guard;
+    auto ret = reshape(grad_output, m_parents[0]->m_shape);
     return {ret};
   }
 };
@@ -388,6 +405,7 @@ class SliceOp : public Operation {
 
   std::vector<std::shared_ptr<TensorImpl>> backward(
       std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
     auto input = m_parents[0];
     Shape& inputShape = input->m_shape;
     auto ret = std::make_shared<TensorImpl>(inputShape);
@@ -418,20 +436,15 @@ class SliceOp : public Operation {
 
 // Helper to align two tensors to a common broadcasted shape.
 std::pair<std::shared_ptr<TensorImpl>, std::shared_ptr<TensorImpl>> alignInputs(
-    std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b,
-    bool track_creator) {
+    std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
   auto target_shape_opt = getBroadcastShape(a->m_shape, b->m_shape);
   if (!target_shape_opt) {
     throw std::runtime_error("Tensors are not broadcast-compatible");
   }
   Shape& target_shape = *target_shape_opt;
 
-  auto a_bc = (a->m_shape == target_shape)
-                  ? a
-                  : broadcast(a, target_shape, track_creator);
-  auto b_bc = (b->m_shape == target_shape)
-                  ? b
-                  : broadcast(b, target_shape, track_creator);
+  auto a_bc = (a->m_shape == target_shape) ? a : broadcast(a, target_shape);
+  auto b_bc = (b->m_shape == target_shape) ? b : broadcast(b, target_shape);
   return {a_bc, b_bc};
 }
 
@@ -522,120 +535,121 @@ bool isPermutation(const std::vector<size_t>& v) {
 // Kernels that perform computations and populate data for `backward`.
 
 std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a,
-                                     std::shared_ptr<TensorImpl> b,
-                                     bool track_creator) {
-  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+                                     std::shared_ptr<TensorImpl> b) {
+  auto [a_bc, b_bc] = alignInputs(a, b);
   auto out = elementwiseBinaryKernel(a_bc, b_bc, std::multiplies<float>());
-  if (track_creator) {
+  out->m_requiresGrad =
+      GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<MulOp>(std::vector{a_bc, b_bc}, out);
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a, float cst,
-                                     bool track_creator) {
+std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a, float cst) {
   auto b = std::make_shared<TensorImpl>(Shape{}, std::vector<float>{cst});
-  return multiply(a, b, track_creator);
+  return multiply(a, b);
 }
 
 std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a,
-                                   std::shared_ptr<TensorImpl> b,
-                                   bool track_creator) {
-  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+                                   std::shared_ptr<TensorImpl> b) {
+  auto [a_bc, b_bc] = alignInputs(a, b);
   auto out = elementwiseBinaryKernel(a_bc, b_bc, std::divides<float>());
-  if (track_creator) {
+  out->m_requiresGrad =
+      GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<DivOp>(std::vector{a_bc, b_bc}, out);
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a, float denom,
-                                   bool track_creator) {
+std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a, float denom) {
   auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{denom});
-  return divide(a, cst, track_creator);
+  return divide(a, cst);
 }
 
-std::shared_ptr<TensorImpl> divide(float num, std::shared_ptr<TensorImpl> b,
-                                   bool track_creator) {
+std::shared_ptr<TensorImpl> divide(float num, std::shared_ptr<TensorImpl> b) {
   auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{num});
-  return divide(cst, b, track_creator);
+  return divide(cst, b);
 }
 
-std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp,
-                                bool track_creator) {
+std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp) {
   auto out =
       elementwiseUnaryKernel(a, [&](float elt) { return std::pow(elt, exp); });
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<PowOp>(std::vector{a}, out, exp);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
-                                std::shared_ptr<TensorImpl> b,
-                                bool track_creator) {
-  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+                                std::shared_ptr<TensorImpl> b) {
+  auto [a_bc, b_bc] = alignInputs(a, b);
   auto out = elementwiseBinaryKernel(a_bc, b_bc, std::plus<float>());
-  if (track_creator) {
+  out->m_requiresGrad =
+      GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<AddOp>(std::vector{a_bc, b_bc}, out);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
-                                     std::shared_ptr<TensorImpl> b,
-                                     bool track_creator) {
-  auto [a_bc, b_bc] = alignInputs(a, b, track_creator);
+                                     std::shared_ptr<TensorImpl> b) {
+  auto [a_bc, b_bc] = alignInputs(a, b);
   auto out = elementwiseBinaryKernel(a_bc, b_bc, std::minus<float>());
-  if (track_creator) {
+  out->m_requiresGrad =
+      GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<SubtractOp>(std::vector{a_bc, b_bc}, out);
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a,
-                                 bool track_creator) {
+std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a) {
   auto out = elementwiseUnaryKernel(a, std::tanh<float>);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<TanhOp>(std::vector{a}, out);
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a,
-                                bool track_creator) {
+std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a) {
   auto out = elementwiseUnaryKernel(a, std::exp<float>);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<ExpOp>(std::vector{a}, out);
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a,
-                                bool track_creator) {
+std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a) {
   auto out = elementwiseUnaryKernel(a, std::log<float>);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<LogOp>(std::vector{a}, out);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> broadcast(std::shared_ptr<TensorImpl> a,
-                                      const Shape& target, bool track_creator) {
+                                      const Shape& target) {
   // Assumes broadcastable, not intended to be a user-facing function for now.
   // only used for implicit broadcasting.
   auto strides = getBroadcastStrides(a, target);
   auto out = std::make_shared<TensorImpl>(target, strides, a->m_data);
   out->m_offset = a->m_offset;
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<BroadcastOp>(std::vector{a}, out);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
-                                    std::vector<int> dimInputs,
-                                    bool track_creator) {
+                                    std::vector<int> dimInputs) {
   auto shape = a->m_shape;
   auto strides = a->m_strides;
   std::vector<int> normalizedDims;
@@ -654,7 +668,8 @@ std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
     strides.erase(strides.begin() + dim);
   }
   auto out = std::make_shared<TensorImpl>(shape, strides, a->m_data);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator =
         std::make_unique<SqueezeOp>(std::vector{a}, out, normalizedDims);
   }
@@ -662,8 +677,7 @@ std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
 }
 
 std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
-                                      std::vector<int> dimInputs,
-                                      bool track_creator) {
+                                      std::vector<int> dimInputs) {
   auto shape = a->m_shape;
   auto strides = a->m_strides;
   std::vector<int> normalizedDims;
@@ -677,7 +691,8 @@ std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
     strides.insert(strides.begin() + dim, 0);
   }
   auto out = std::make_shared<TensorImpl>(shape, strides, a->m_data);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator =
         std::make_unique<UnsqueezeOp>(std::vector{a}, out, normalizedDims);
   }
@@ -685,16 +700,15 @@ std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
 }
 
 std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
-                                   std::shared_ptr<TensorImpl> b,
-                                   bool track_creator) {
+                                   std::shared_ptr<TensorImpl> b) {
   if (a->getRank() == 0 || b->getRank() == 0) {
     throw std::runtime_error("Both tensors must be at least rank-1");
   }
 
   // Following the rules provided in
   // https://docs.pytorch.org/docs/stable/generated/torch.matmul.html.
-  auto a_2d = a->getRank() == 1 ? unsqueeze(a, {-2}, track_creator) : a;
-  auto b_2d = b->getRank() == 1 ? unsqueeze(b, {-1}, track_creator) : b;
+  auto a_2d = a->getRank() == 1 ? unsqueeze(a, {-2}) : a;
+  auto b_2d = b->getRank() == 1 ? unsqueeze(b, {-1}) : b;
 
   // Broadcast the first rank-2 dimensions
   auto shapesOpt = getBroadcastShapesForMatmul(a_2d->m_shape, b_2d->m_shape);
@@ -703,12 +717,8 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   }
   auto [shape_a_2d, shape_b_2d] = *shapesOpt;
   // Note: shares the same data as `a` and `b`.
-  auto a_bc = shape_a_2d != a_2d->m_shape
-                  ? broadcast(a_2d, shape_a_2d, track_creator)
-                  : a_2d;
-  auto b_bc = shape_b_2d != b_2d->m_shape
-                  ? broadcast(b_2d, shape_b_2d, track_creator)
-                  : b_2d;
+  auto a_bc = shape_a_2d != a_2d->m_shape ? broadcast(a_2d, shape_a_2d) : a_2d;
+  auto b_bc = shape_b_2d != b_2d->m_shape ? broadcast(b_2d, shape_b_2d) : b_2d;
 
   // It holds that a_bc and b_bc are both at least two dimensions, and the
   // shapes are matmul-compatible.
@@ -719,7 +729,9 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
 
   matmulBatched(matmulRes, a_bc, b_bc);
 
-  if (track_creator) {
+  matmulRes->m_requiresGrad =
+      GradMode::enabled && (a_bc->m_requiresGrad || b_bc->m_requiresGrad);
+  if (matmulRes->m_requiresGrad) {
     matmulRes->m_creator =
         std::make_unique<MatmulOp>(std::vector{a_bc, b_bc}, matmulRes);
   }
@@ -732,16 +744,13 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
     squeezeDims.push_back(-1);
   }
   if (!squeezeDims.empty()) {
-    // Note: the old matmulRes still exists if track_creator is enabled, as a
-    // shared pointer.
-    matmulRes = squeeze(matmulRes, squeezeDims, track_creator);
+    matmulRes = squeeze(matmulRes, squeezeDims);
   }
   return matmulRes;
 }
 
 std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
-                                    std::vector<size_t> dims,
-                                    bool track_creator) {
+                                    std::vector<size_t> dims) {
   size_t rank = a->getRank();
   if (dims.size() != rank || !isPermutation(dims)) {
     throw std::runtime_error("Incorrect dims value passed to permute");
@@ -754,7 +763,8 @@ std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
   }
   auto out = std::make_shared<TensorImpl>(newShape, newStrides, a->m_data);
   out->m_offset = a->m_offset;
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<PermuteOp>(std::vector{a}, out, dims);
   }
   return out;
@@ -762,7 +772,7 @@ std::shared_ptr<TensorImpl> permute(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
                                       std::vector<int> dimInputs,
-                                      bool keep_dims, bool track_creator) {
+                                      bool keep_dims) {
   Shape outShape = a->m_shape;
   std::vector<int> normalizedDims;
   for (auto dimInput : dimInputs) {
@@ -793,20 +803,20 @@ std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
     (*out->m_data)[offset_view] += (*a->m_data)[offset_out];
     incrementCoords(coords, a->m_shape);
   }
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<ReduceSumOp>(std::vector{a}, out);
   }
   // If `keep_dims` is false, performs a squeeze, so the backward pass of
   // `reduceSum` can assume that any reduced dimensions are set to 1.
   if (!keep_dims) {
-    out = squeeze(out, normalizedDims, track_creator);
+    out = squeeze(out, normalizedDims);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
-                                      int dimInput, bool keep_dim,
-                                      bool track_creator) {
+                                      int dimInput, bool keep_dim) {
   Shape outShape = a->m_shape;
   int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
   outShape[dim] = 1;
@@ -835,18 +845,18 @@ std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
     }
     incrementCoords(coords, a->m_shape);
   }
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator =
         std::make_unique<ReduceMaxOp>(std::vector{a}, out, dim, argmax);
   }
   if (!keep_dim) {
-    out = squeeze(out, {dim}, track_creator);
+    out = squeeze(out, {dim});
   }
   return out;
 }
 
-std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a,
-                                           bool track_creator) {
+std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a) {
   if (a->isContiguous()) {
     return a;
   }
@@ -860,14 +870,15 @@ std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a,
   }
   // contiguous, so ctor will calculate default strides.
   auto out = std::make_shared<TensorImpl>(a->m_shape, newData);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<MakeContiguousOp>(std::vector{a}, out);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
-                                    Shape newShape, bool track_creator) {
+                                    Shape newShape) {
   // TODO: verify newShape.
   // Note: we use a weaker condition in terms of when a reshape view is
   // possible. Need to understand the stronger condition and potentially use it
@@ -875,15 +886,15 @@ std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
   auto a_cont = makeContiguous(a);
   auto out = std::make_shared<TensorImpl>(
       newShape, defaultStridesFromShape(newShape), a_cont->m_data);
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a_cont->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<ReshapeOp>(std::vector{a_cont}, out);
   }
   return out;
 }
 
 std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
-                                  std::vector<int> start, Shape size,
-                                  bool track_creator) {
+                                  std::vector<int> start, Shape size) {
   if (start.size() != size.size() || start.size() != a->getRank()) {
     throw std::runtime_error(
         "Invalid start/size lists, must be equal to rank of input");
@@ -895,7 +906,8 @@ std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
   }
   auto out = std::make_shared<TensorImpl>(size, a->m_strides, a->m_data);
   out->m_offset = newOffset;
-  if (track_creator) {
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<SliceOp>(
         std::vector{a}, out, std::move(start), std::move(size));
   }

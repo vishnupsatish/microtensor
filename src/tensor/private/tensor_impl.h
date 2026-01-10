@@ -27,8 +27,7 @@ struct TensorImpl {
   Shape m_shape;
   std::shared_ptr<TensorImpl> m_grad;
   size_t m_offset = 0;
-  // Automatically require gradient for now.
-  // const bool requires_grad = false;
+  bool m_requiresGrad;
 
   void initializeGrad();
   void accumulateGrad(std::shared_ptr<TensorImpl> new_grad);
@@ -36,10 +35,11 @@ struct TensorImpl {
   std::unique_ptr<Operation> m_creator;
 
   // Uses default strides for the shape.
-  TensorImpl(const Shape& shape);
+  TensorImpl(const Shape& shape, bool requiresGrad = false);
   TensorImpl(const Shape& shape, const std::vector<size_t>& strides,
-             std::shared_ptr<Storage> data);
-  TensorImpl(const Shape& shape, const std::vector<float>& data);
+             std::shared_ptr<Storage> data, bool requiresGrad = false);
+  TensorImpl(const Shape& shape, const std::vector<float>& data,
+             bool requiresGrad = false);
 
   void fillRandom();
   void print(std::ostream& os);
