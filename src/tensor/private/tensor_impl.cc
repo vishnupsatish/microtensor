@@ -18,6 +18,7 @@
 #include "grad_mode.h"
 #include "operation.h"
 #include "shape.h"
+
 namespace {
 
 void buildTopo(Operation* op, std::set<Operation*>& visited,
