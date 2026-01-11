@@ -69,22 +69,6 @@ bool TensorImpl::isContiguous() const {
   return true;
 }
 
-void TensorImpl::fillRandom() {
-  float mn = 0;
-  float mx = 10;
-
-  std::random_device rd;
-  std::mt19937 gen(rd());  // seeded each call
-  std::uniform_real_distribution<float> dist(mn, mx);
-
-  // TODO: must take into account the offset, and also that the storage could be
-  // shared... not ideal. In general, operations that mutate tensor data is
-  // unclean with this design.
-  for (auto& x : *m_data) {
-    x = dist(gen);
-  }
-}
-
 // Initialize to all ones.
 void TensorImpl::initializeGrad() {
   m_grad = std::make_shared<TensorImpl>(m_shape);
@@ -123,9 +107,10 @@ void TensorImpl::backward() {
 
   for (auto op : topo_order) {
     std::shared_ptr<TensorImpl> outTensor = op->m_output.lock();
-    if (!outTensor->m_requiresGrad) {
-      continue;
-    }
+    // It is a necessary (but not sufficient) condition that `outTensor`
+    // requires gradient for the operation node to be created in the first
+    // place.
+    assert(outTensor->m_requiresGrad);
     auto inp_grads = op->backward(outTensor->m_grad);
     assert(inp_grads.size() == op->m_parents.size());
     for (size_t i = 0; i < op->m_parents.size(); ++i) {

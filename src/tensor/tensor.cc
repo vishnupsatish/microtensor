@@ -9,8 +9,12 @@
 #include <memory>
 #include <vector>
 
+// TODO: this might be a problem... exposing all these operation methods and
+// also exposing TensorImpl
 #include "private/operation.h"
 #include "private/tensor_impl.h"
+
+Tensor::Tensor() : m_impl{nullptr} {}
 
 Tensor::Tensor(const Shape& shape, bool requiresGrad)
     : m_impl{std::make_shared<TensorImpl>(shape, requiresGrad)} {}
@@ -24,8 +28,6 @@ Tensor::Tensor(const Shape& shape, const std::vector<float>& data,
     : m_impl{std::make_shared<TensorImpl>(shape, data, requiresGrad)} {}
 
 bool Tensor::isValid() const { return m_impl != nullptr; }
-
-void Tensor::fillRandom() { m_impl->fillRandom(); }
 
 void Tensor::print(std::ostream& os) { m_impl->print(os); }
 
@@ -45,9 +47,15 @@ Tensor Tensor::operator*(const Tensor& other) {
   return Tensor{multiply(m_impl, other.m_impl)};
 }
 
+Tensor Tensor::operator*(float other) {
+  return Tensor{multiply(m_impl, other)};
+}
+
 Tensor Tensor::operator/(const Tensor& other) {
   return Tensor{divide(m_impl, other.m_impl)};
 }
+
+Tensor Tensor::operator/(float other) { return Tensor{divide(m_impl, other)}; }
 
 Tensor Tensor::pow(float exp) { return Tensor{::pow(m_impl, exp)}; }
 
@@ -85,6 +93,13 @@ Tensor Tensor::makeContiguous() { return Tensor{::makeContiguous(m_impl)}; }
 
 Tensor Tensor::slice(const std::vector<int>& start, const Shape& size) {
   return Tensor{::slice(m_impl, start, size)};
+}
+
+Tensor Tensor::relu() { return Tensor(::relu(m_impl)); }
+
+Tensor& Tensor::operator-=(const Tensor& other) {
+  subtract_(m_impl, other.m_impl);
+  return *this;
 }
 
 void Tensor::backward() { m_impl->backward(); }

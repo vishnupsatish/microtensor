@@ -2,7 +2,7 @@
 
 Inspired by some of the things I worked on and saw colleagues work on at Huawei.
 
-No external dependencies; meaning everything, starting from tensors, are implemented from scratch.
+No external dependencies.
 
 ### Goals
 
@@ -21,3 +21,4 @@ Notes:
 - Tensors are immutable if the goal is to perform backpropagation
 - Not very efficient at the moment; virtual function calls, pointer chasing, no parallelism, etc.
   - Even element-wise operations are not efficient, iterating the elements of a tensor is not clean at the moment
+- Most abstractions are modelled off of PyTorch

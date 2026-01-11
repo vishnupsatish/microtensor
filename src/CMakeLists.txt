@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(Main main.cc)
-target_link_libraries(Main Tensor)
+target_link_libraries(Main Tensor Module Models util)
 
 add_subdirectory(tensor)
+add_subdirectory(module)
+add_subdirectory(util)
+add_subdirectory(models)

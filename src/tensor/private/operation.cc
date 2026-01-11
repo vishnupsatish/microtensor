@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "grad_mode.h"
+#include "kernels.h"
 #include "shape.h"
 #include "tensor_impl.h"
 
@@ -23,39 +24,6 @@
 // users shouldn't be interfacing with TensorImpl directly anyways.
 
 namespace {
-
-template <typename F>
-std::shared_ptr<TensorImpl> elementwiseBinaryKernel(
-    std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b,
-    F&& binary_fn) {
-  auto out = std::make_shared<TensorImpl>(a->m_shape);
-  size_t total_elements = sizeFromShape(a->m_shape);
-  std::vector<size_t> coords(a->m_shape.size(), 0);
-
-  for (size_t i = 0; i < total_elements; ++i) {
-    size_t offset_a = getPhysicalOffset(coords, a->m_strides, a->m_offset);
-    size_t offset_b = getPhysicalOffset(coords, b->m_strides, b->m_offset);
-    (*out->m_data)[i] =
-        binary_fn((*a->m_data)[offset_a], (*b->m_data)[offset_b]);
-    incrementCoords(coords, a->m_shape);
-  }
-  return out;
-}
-
-template <typename F>
-std::shared_ptr<TensorImpl> elementwiseUnaryKernel(
-    std::shared_ptr<TensorImpl> a, F&& unary_fn) {
-  auto out = std::make_shared<TensorImpl>(a->m_shape);
-  size_t total_elements = sizeFromShape(a->m_shape);
-  std::vector<size_t> coords(a->m_shape.size(), 0);
-
-  for (size_t i = 0; i < total_elements; ++i) {
-    size_t offset_a = getPhysicalOffset(coords, a->m_strides, a->m_offset);
-    (*out->m_data)[i] = unary_fn((*a->m_data)[offset_a]);
-    incrementCoords(coords, a->m_shape);
-  }
-  return out;
-}
 
 class AddOp : public Operation {
  public:
@@ -79,9 +47,9 @@ class SubtractOp : public Operation {
     NoGrad guard;
     // If shapes are not the same, handled by BroadcastOp.
     assert(m_parents[0]->m_shape == m_parents[1]->m_shape);
-    auto neg_grad =
-        elementwiseUnaryKernel(grad_output, [](float g) { return -g; });
-    return {grad_output, neg_grad};
+    auto negGrad = std::make_shared<TensorImpl>(m_parents[0]->m_shape);
+    elementwiseUnaryKernel(negGrad, grad_output, [](float g) { return -g; });
+    return {grad_output, negGrad};
   }
 };
 
@@ -121,9 +89,10 @@ class DivOp : public Operation {
     // grad * 1/b
     auto grad_op1 = multiply(grad_output, divide(1.0f, denom));
     // grad * -(a/b^2)
-    auto grad_op2 = multiply(
-        grad_output, elementwiseUnaryKernel(divide(num, pow(denom, 2)),
-                                            [](float x) { return -x; }));
+    auto div = divide(num, pow(denom, 2));
+    auto neg = std::make_shared<TensorImpl>(div->m_shape);
+    elementwiseUnaryKernel(neg, div, [](float x) { return -x; });
+    auto grad_op2 = multiply(grad_output, neg);
     return {grad_op1, grad_op2};
   }
 };
@@ -157,8 +126,11 @@ class TanhOp : public Operation {
     // TODO: is it ever possible for this to fail?
     auto out = m_output.lock();
     // grad_input = grad_output * (1 - out^2)
-    return {elementwiseBinaryKernel(
-        grad_output, out, [](float g, float y) { return g * (1.0f - y * y); })};
+    auto res = std::make_shared<TensorImpl>(grad_output->m_shape);
+    elementwiseBinaryKernel(res, grad_output, out, [](float g, float y) {
+      return g * (1.0f - y * y);
+    });
+    return {res};
   }
 };
 
@@ -410,7 +382,7 @@ class SliceOp : public Operation {
     Shape& inputShape = input->m_shape;
     auto ret = std::make_shared<TensorImpl>(inputShape);
     std::fill(ret->m_data->begin(), ret->m_data->end(), 0.0f);
-    // will/should be 0
+    // should be 0
     size_t offset = ret->m_offset;
     for (size_t i = 0; i < m_start.size(); ++i) {
       offset += m_start[i] * ret->m_strides[i];
@@ -428,6 +400,21 @@ class SliceOp : public Operation {
       (*ret->m_data)[retOffset] = (*grad_output->m_data)[gradOffset];
       incrementCoords(coords, m_size);
     }
+    return {ret};
+  }
+};
+
+class ReLUOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    auto ret = std::make_shared<TensorImpl>(m_parents[0]->m_shape);
+    elementwiseBinaryKernel(
+        ret, m_parents[0], grad_output,
+        [](float par, float grad) { return par >= 0 ? grad : 0; });
     return {ret};
   }
 };
@@ -537,7 +524,8 @@ bool isPermutation(const std::vector<size_t>& v) {
 std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a,
                                      std::shared_ptr<TensorImpl> b) {
   auto [a_bc, b_bc] = alignInputs(a, b);
-  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::multiplies<float>());
+  auto out = std::make_shared<TensorImpl>(a_bc->m_shape);
+  elementwiseBinaryKernel(out, a_bc, b_bc, std::multiplies<float>());
   out->m_requiresGrad =
       GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
   if (out->m_requiresGrad) {
@@ -554,7 +542,8 @@ std::shared_ptr<TensorImpl> multiply(std::shared_ptr<TensorImpl> a, float cst) {
 std::shared_ptr<TensorImpl> divide(std::shared_ptr<TensorImpl> a,
                                    std::shared_ptr<TensorImpl> b) {
   auto [a_bc, b_bc] = alignInputs(a, b);
-  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::divides<float>());
+  auto out = std::make_shared<TensorImpl>(a_bc->m_shape);
+  elementwiseBinaryKernel(out, a_bc, b_bc, std::divides<float>());
   out->m_requiresGrad =
       GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
   if (out->m_requiresGrad) {
@@ -574,8 +563,8 @@ std::shared_ptr<TensorImpl> divide(float num, std::shared_ptr<TensorImpl> b) {
 }
 
 std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp) {
-  auto out =
-      elementwiseUnaryKernel(a, [&](float elt) { return std::pow(elt, exp); });
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, [&](float elt) { return std::pow(elt, exp); });
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<PowOp>(std::vector{a}, out, exp);
@@ -586,7 +575,8 @@ std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp) {
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
                                 std::shared_ptr<TensorImpl> b) {
   auto [a_bc, b_bc] = alignInputs(a, b);
-  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::plus<float>());
+  auto out = std::make_shared<TensorImpl>(a_bc->m_shape);
+  elementwiseBinaryKernel(out, a_bc, b_bc, std::plus<float>());
   out->m_requiresGrad =
       GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
   if (out->m_requiresGrad) {
@@ -598,7 +588,8 @@ std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
                                      std::shared_ptr<TensorImpl> b) {
   auto [a_bc, b_bc] = alignInputs(a, b);
-  auto out = elementwiseBinaryKernel(a_bc, b_bc, std::minus<float>());
+  auto out = std::make_shared<TensorImpl>(a_bc->m_shape);
+  elementwiseBinaryKernel(out, a_bc, b_bc, std::minus<float>());
   out->m_requiresGrad =
       GradMode::enabled && (a->m_requiresGrad || b->m_requiresGrad);
   if (out->m_requiresGrad) {
@@ -608,7 +599,8 @@ std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
 }
 
 std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a) {
-  auto out = elementwiseUnaryKernel(a, std::tanh<float>);
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, std::tanh<float>);
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<TanhOp>(std::vector{a}, out);
@@ -617,7 +609,8 @@ std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a) {
 }
 
 std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a) {
-  auto out = elementwiseUnaryKernel(a, std::exp<float>);
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, std::exp<float>);
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<ExpOp>(std::vector{a}, out);
@@ -626,7 +619,8 @@ std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a) {
 }
 
 std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a) {
-  auto out = elementwiseUnaryKernel(a, std::log<float>);
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, std::log<float>);
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<LogOp>(std::vector{a}, out);
@@ -912,4 +906,45 @@ std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
         std::vector{a}, out, std::move(start), std::move(size));
   }
   return out;
+}
+
+std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a) {
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, [](float val) { return std::max(val, 0.0f); });
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
+    out->m_creator = std::make_unique<ReLUOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// In-place operations. Used by the optimizer and should also be used in the
+// future in `backward` implementations of several operations.
+
+// Assumes `a` is the Tensor we are changing.
+// Returns new `b` after broadcasting.
+std::shared_ptr<TensorImpl> alignInputsForInPlace(
+    std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
+  // Uses the same semantics as PyTorch; in particular, the shape of `a` cannot
+  // change as a result of broadcasting.
+  auto target_shape_opt = getBroadcastShape(a->m_shape, b->m_shape);
+  if (!target_shape_opt || a->m_shape != *target_shape_opt) {
+    throw std::runtime_error(
+        "Tensors are not broadcast-compatible, or the in-place tensor's shape "
+        "changes");
+  }
+  Shape& target_shape = *target_shape_opt;
+  auto b_bc = (b->m_shape == target_shape) ? b : broadcast(b, target_shape);
+  return b_bc;
+}
+
+void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
+  if (GradMode::enabled) {
+    throw std::runtime_error{
+        "Gradient must be disabled when performing in-place operations"};
+  }
+  auto b_bc = alignInputsForInPlace(a, b);
+  elementwiseBinaryKernel(a, a, b_bc, std::minus<float>());
 }

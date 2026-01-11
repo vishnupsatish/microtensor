@@ -41,7 +41,6 @@ struct TensorImpl {
   TensorImpl(const Shape& shape, const std::vector<float>& data,
              bool requiresGrad = false);
 
-  void fillRandom();
   void print(std::ostream& os);
   void dumpTensor(std::ostream& os);
 
@@ -52,6 +51,9 @@ struct TensorImpl {
   bool isContiguous() const;
 
   void backward();
+
+  template <typename F>
+  void fillRandom(F&& initFn);
 };
 
 // TODO: in the future, this could be part of a tensor iterator class.
@@ -62,3 +64,13 @@ void incrementCoords(std::vector<size_t>& coords, const Shape& shape);
 
 std::vector<size_t> getBroadcastStrides(std::shared_ptr<TensorImpl> a,
                                         const Shape& target);
+template <typename F>
+void TensorImpl::fillRandom(F&& initFn) {
+  size_t total_elements = sizeFromShape(m_shape);
+  std::vector<size_t> coords(m_shape.size(), 0);
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset_a = getPhysicalOffset(coords, m_strides, m_offset);
+    (*m_data)[i] = initFn();
+    incrementCoords(coords, m_shape);
+  }
+}

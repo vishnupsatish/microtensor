@@ -83,3 +83,7 @@ std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
                                   std::vector<int> start, Shape size);
+
+std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a);
+
+void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);

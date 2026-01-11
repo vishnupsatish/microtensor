@@ -6,68 +6,41 @@
 #include <iostream>
 #include <memory>
 
-#include "tensor/tensor.h"
+#include "grad_mode.h"
+#include "loss_function.h"
+#include "models/xor.h"
+#include "module.h"
+#include "optimizer.h"
+#include "random_gen.h"
+#include "tensor.h"
 
 int main() {
-  auto a = Tensor(Shape{2, 2});
-  a.fillRandom();
-  std::cout << "a: ";
-  a.print(std::cout);
-  std::cout << '\n';
+  RNG::setSeed(42);
+  auto model = XOR{};
+  auto opt = SGD{model.getParameters(), 0.01};
 
-  auto b = Tensor(Shape{2, 1, 2});
-  b.fillRandom();
-  std::cout << "b: ";
-  b.print(std::cout);
-  std::cout << '\n';
+  Tensor x{Shape{4, 2}, std::vector<float>{0, 0, 0, 1, 1, 0, 1, 1}};
+  Tensor y{Shape{4, 1}, std::vector<float>{0, 1, 1, 0}};
 
-  auto c = a + b;
-  std::cout << "c: ";
-  c.print(std::cout);
-  std::cout << '\n';
-  std::cout << "c shape: ";
-  c.getShape().print(std::cout);
-  std::cout << '\n';
+  std::cout << "Training...\n";
+  for (int epoch = 1; epoch <= 5000; ++epoch) {
+    opt.zeroGrad();
+    auto pred = model.forward(x);
+    auto loss = meanSquaredError(pred, y);
+    loss.backward();
+    opt.step();
+  }
 
-  auto d = c * a;
-  std::cout << "d: ";
-  d.print(std::cout);
-  std::cout << '\n';
-  std::cout << "d shape: ";
-  d.getShape().print(std::cout);
-  std::cout << '\n';
-
-  d.backward();
-
-  std::cout << "\nprint gradients\n";
-
-  std::cout << "d grad: ";
-  d.getGrad().print(std::cout);
-  std::cout << '\n';
-  std::cout << "d grad shape: ";
-  d.getGrad().getShape().print(std::cout);
-  std::cout << '\n';
-
-  std::cout << "c grad: ";
-  c.getGrad().print(std::cout);
-  std::cout << '\n';
-  std::cout << "c grad shape: ";
-  c.getGrad().getShape().print(std::cout);
-  std::cout << '\n';
-
-  std::cout << "b grad: ";
-  b.getGrad().print(std::cout);
-  std::cout << '\n';
-  std::cout << "b grad shape: ";
-  b.getGrad().getShape().print(std::cout);
-  std::cout << '\n';
-
-  std::cout << "a grad: ";
-  a.getGrad().print(std::cout);
-  std::cout << '\n';
-  std::cout << "a grad shape: ";
-  a.getGrad().getShape().print(std::cout);
-  std::cout << '\n';
-
-  return 0;
+  std::cout << "\nInference:\n";
+  {
+    NoGrad guard;
+    auto final_pred = model.forward(x);
+    std::cout << "Inputs:\n";
+    x.print(std::cout);
+    std::cout << "\nPredictions:\n";
+    final_pred.print(std::cout);
+    std::cout << "\nTargets:\n";
+    y.print(std::cout);
+    std::cout << "\n";
+  }
 }
