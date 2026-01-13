@@ -43,6 +43,8 @@ std::shared_ptr<TensorImpl> pow(std::shared_ptr<TensorImpl> a, float exp);
 std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
                                 std::shared_ptr<TensorImpl> b);
 
+std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a, float b);
+
 std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
                                      std::shared_ptr<TensorImpl> b);
 

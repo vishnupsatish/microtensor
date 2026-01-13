@@ -39,6 +39,8 @@ Tensor Tensor::operator+(const Tensor& other) {
   return Tensor{add(m_impl, other.m_impl)};
 }
 
+Tensor Tensor::operator+(float other) { return Tensor{add(m_impl, other)}; }
+
 Tensor Tensor::operator-(const Tensor& other) {
   return Tensor{subtract(m_impl, other.m_impl)};
 }

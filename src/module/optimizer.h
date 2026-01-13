@@ -27,3 +27,22 @@ class SGD : public Optimizer {
 
   void step() override;
 };
+
+class AdamW : public Optimizer {
+  float m_learningRate = 0.001;
+  float m_beta1 = 0.9;
+  float m_beta2 = 0.999;
+  float m_epsilon = 1e-8;
+  float m_weightDecay = 0.01;
+  float m_t = 1;
+
+  std::vector<Tensor> m_moment1;
+  std::vector<Tensor> m_moment2;
+
+ public:
+  AdamW(std::vector<Tensor> parameters);
+  AdamW(std::vector<Tensor> parameters, float learningRate, float beta1,
+        float beta2, float epsilon, float weightDecay);
+
+  void step() override;
+};

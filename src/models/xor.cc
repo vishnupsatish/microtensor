@@ -35,18 +35,26 @@ class XOR : public Module {
 int main() {
   RNG::setSeed(42);
   auto model = XOR{};
-  auto opt = SGD{model.getParameters(), 0.01};
+  // We can use AdamW now!!!
+  auto opt = AdamW{model.getParameters(), 0.01, 0.9, 0.999, 1e-8, 0.01};
+  // auto opt = SGD{model.getParameters(), 0.01};
 
   Tensor x{Shape{4, 2}, std::vector<float>{0, 0, 0, 1, 1, 0, 1, 1}};
   Tensor y{Shape{4, 1}, std::vector<float>{0, 1, 1, 0}};
 
   std::cout << "Training...\n";
-  for (int epoch = 1; epoch <= 5000; ++epoch) {
-    opt.zeroGrad();
-    auto pred = model.forward(x);
-    auto loss = meanSquaredError(pred, y);
-    loss.backward();
-    opt.step();
+  for (int epoch = 1; epoch <= 1000; ++epoch) {
+    // Can pick a random data point instead.
+    for (int i = 0; i < 4; ++i) {
+      Tensor x_single = x.slice({i, 0}, {1, 2});
+      Tensor y_single = y.slice({i, 0}, {1, 1});
+
+      opt.zeroGrad();
+      auto pred = model.forward(x_single);
+      auto loss = meanSquaredError(pred, y_single);
+      loss.backward();
+      opt.step();
+    }
   }
 
   std::cout << "\nInference:\n";

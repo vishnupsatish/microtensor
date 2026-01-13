@@ -585,6 +585,11 @@ std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a,
   return out;
 }
 
+std::shared_ptr<TensorImpl> add(std::shared_ptr<TensorImpl> a, float b) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{b});
+  return add(a, cst);
+}
+
 std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
                                      std::shared_ptr<TensorImpl> b) {
   auto [a_bc, b_bc] = alignInputs(a, b);

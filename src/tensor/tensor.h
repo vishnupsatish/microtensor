@@ -32,6 +32,7 @@ class Tensor {
 
   // Operations that create new Tensors and also create DAG nodes.
   Tensor operator+(const Tensor& other);
+  Tensor operator+(float other);
   Tensor operator-(const Tensor& other);
   Tensor operator*(const Tensor& other);
   Tensor operator*(float other);
