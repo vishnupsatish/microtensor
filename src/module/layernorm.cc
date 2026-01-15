@@ -8,8 +8,9 @@
 LayerNorm::LayerNorm(Shape shape)
     : m_shape{std::move(shape)},
       m_numReduceElements{sizeFromShape(m_shape)},
-      m_weight{Tensor{m_shape, std::vector<float>(m_numReduceElements, 1)}},
-      m_bias{Tensor{m_shape, std::vector<float>(m_numReduceElements, 0)}},
+      m_weight{
+          Tensor{m_shape, std::vector<float>(m_numReduceElements, 1), true}},
+      m_bias{Tensor{m_shape, std::vector<float>(m_numReduceElements, 0), true}},
       m_reduceDims(shape.size()) {
   insertParameter(m_weight);
   insertParameter(m_bias);

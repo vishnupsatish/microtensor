@@ -923,6 +923,19 @@ std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a) {
   return out;
 }
 
+std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim) {
+  // Do not need to have a specific SoftmaxOp since it is a combination of
+  // several operations that have their own backward passes defined, so it will
+  // just work.
+  // In the future, this should be implemented as a fused kernel for better
+  // numerical stability.
+  auto mx = reduceMax(a, dim, true);
+  auto shifted = subtract(a, mx);
+  auto expA = exp(shifted);
+  auto sumExp = reduceSum(expA, {dim}, true);
+  return divide(expA, sumExp);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // In-place operations. Used by the optimizer and should also be used in the

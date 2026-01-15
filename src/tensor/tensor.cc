@@ -99,6 +99,8 @@ Tensor Tensor::slice(const std::vector<int>& start, const Shape& size) {
 
 Tensor Tensor::relu() { return Tensor(::relu(m_impl)); }
 
+Tensor Tensor::softmax(int dim) { return Tensor(::softmax(m_impl, dim)); }
+
 Tensor& Tensor::operator-=(const Tensor& other) {
   subtract_(m_impl, other.m_impl);
   return *this;

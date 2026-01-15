@@ -51,6 +51,7 @@ class Tensor {
   Tensor makeContiguous();
   Tensor slice(const std::vector<int>& start, const Shape& size);
   Tensor relu();
+  Tensor softmax(int dim);
 
   // In-place operations.
   Tensor& operator-=(const Tensor& other);

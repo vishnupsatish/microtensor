@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch_utils import dump_torch_tensor
 
 def run():
@@ -106,6 +107,44 @@ def run():
     res19.backward(torch.ones_like(res19))
     results.append(a19.grad.numpy())
     results.append(b19.grad.numpy())
+
+    # Test 20: Basic 1D Softmax Forward
+    a20 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
+    b20 = F.softmax(a20, dim=0)
+    results.append(b20.detach().numpy())
+
+    # Test 21: 2D Softmax Forward along dim 0
+    a21 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
+    b21 = F.softmax(a21, dim=0)
+    results.append(b21.detach().numpy())
+
+    # Test 22: 2D Softmax Forward along dim 1
+    a22 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
+    b22 = F.softmax(a22, dim=1)
+    results.append(b22.detach().numpy())
+
+    # Test 23: Softmax Backward 1D
+    a23 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32, requires_grad=True)
+    b23 = F.softmax(a23, dim=0)
+    c23 = b23 * torch.tensor([0.1, 0.2, 0.3], dtype=torch.float32)
+    d23 = c23.sum()
+    d23.backward()
+    results.append(a23.grad.numpy())
+
+    # Test 24: Softmax Backward 2D dim 1
+    a24 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32, requires_grad=True)
+    b24 = F.softmax(a24, dim=1)
+    c24 = b24.sum()
+    c24.backward()
+    results.append(a24.grad.numpy())
+
+    # Test 25: Complex chain with Softmax
+    a25 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
+    b25 = torch.tensor([[0.5, 1.5], [2.5, 3.5]], dtype=torch.float32, requires_grad=True)
+    res25 = F.log_softmax(a25 + b25, dim=1).sum()
+    res25.backward()
+    results.append(a25.grad.numpy())
+    results.append(b25.grad.numpy())
 
     return results
 

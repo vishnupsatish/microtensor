@@ -88,4 +88,6 @@ std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a);
 
+std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim);
+
 void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);
