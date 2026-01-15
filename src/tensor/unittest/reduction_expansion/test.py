@@ -146,6 +146,35 @@ def run():
     results.append(a25.grad.numpy())
     results.append(b25.grad.numpy())
 
+    # Test 26: triu forward
+    a26 = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=torch.float32)
+    results.append(torch.triu(a26, diagonal=0).numpy())
+    results.append(torch.triu(a26, diagonal=1).numpy())
+    results.append(torch.triu(a26, diagonal=-1).numpy())
+
+    # Test 27: triu backward
+    a27 = torch.ones((2, 3, 3), dtype=torch.float32, requires_grad=True)
+    b27 = torch.triu(a27, diagonal=1)
+    c27 = b27.sum()
+    c27.backward()
+    results.append(a27.grad.numpy())
+
+    # Test 28: maskedFill basic
+    a28 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
+    mask28 = torch.tensor([[0, 1], [1, 0]], dtype=torch.float32)
+    b28 = torch.masked_fill(a28, mask28 == 1, -1e9)
+    results.append(b28.detach().numpy())
+    b28.sum().backward()
+    results.append(a28.grad.numpy())
+
+    # Test 29: Causal mask style
+    a29 = torch.ones((3, 3), dtype=torch.float32, requires_grad=True)
+    mask29 = torch.triu(torch.ones((3, 3)), diagonal=1)
+    b29 = torch.masked_fill(a29, mask29 == 1, -1e9)
+    results.append(b29.detach().numpy())
+    b29.sum().backward()
+    results.append(a29.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

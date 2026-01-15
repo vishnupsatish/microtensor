@@ -90,4 +90,13 @@ std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a);
 
 std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim);
 
+// Keeps upper triangular part of the matrix. Positive diagonal value: how many
+// diagonals to exclude above the main diagonal.
+std::shared_ptr<TensorImpl> triu(std::shared_ptr<TensorImpl> a,
+                                 int diagonal = 0);
+
+std::shared_ptr<TensorImpl> maskedFill(std::shared_ptr<TensorImpl> a,
+                                       std::shared_ptr<TensorImpl> mask,
+                                       float val);
+
 void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);

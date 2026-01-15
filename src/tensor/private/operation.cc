@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include "grad_mode.h"
@@ -416,6 +417,41 @@ class ReLUOp : public Operation {
         ret, m_parents[0], grad_output,
         [](float par, float grad) { return par >= 0 ? grad : 0; });
     return {ret};
+  }
+};
+
+class TriuOp : public Operation {
+  int m_diagonal;
+
+ public:
+  TriuOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+         std::shared_ptr<TensorImpl> output, int diagonal)
+      : Operation(std::move(parents), output), m_diagonal{diagonal} {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    return {triu(grad_output, m_diagonal)};
+  }
+};
+
+class MaskedFillOp : public Operation {
+  float m_val;
+
+ public:
+  MaskedFillOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+               std::shared_ptr<TensorImpl> output, float val)
+      : Operation(std::move(parents), output), m_val{val} {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    // Note: in the forward implementation we assert that the mask does not
+    // require a grad, but the autograd asserts that the number of inputs (as
+    // provided in m_parents) is equal to the number of gradients we return from
+    // this function. Therefore, we provide a nullptr as the gradient associated
+    // with the mask, as it will never be used.
+    return {maskedFill(grad_output, m_parents[1], 0), nullptr};
   }
 };
 
@@ -934,6 +970,58 @@ std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim) {
   auto expA = exp(shifted);
   auto sumExp = reduceSum(expA, {dim}, true);
   return divide(expA, sumExp);
+}
+
+std::shared_ptr<TensorImpl> triu(std::shared_ptr<TensorImpl> a, int diagonal) {
+  if (a->getRank() < 2) {
+    throw std::runtime_error("triu only supported for rank >= 2");
+  }
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  size_t total_elements = sizeFromShape(a->m_shape);
+  std::vector<size_t> coords(a->m_shape.size(), 0);
+  size_t aRank = a->getRank();
+
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset_a = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    size_t offset_res =
+        getPhysicalOffset(coords, out->m_strides, out->m_offset);
+    // j - i >= diagonal => kept, otherwise 0.
+    int i_coord = static_cast<int>(coords[aRank - 2]);
+    int j_coord = static_cast<int>(coords[aRank - 1]);
+    (*out->m_data)[offset_res] =
+        (j_coord - i_coord >= diagonal) ? (*a->m_data)[offset_a] : 0.0f;
+    incrementCoords(coords, a->m_shape);
+  }
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
+    out->m_creator = std::make_unique<TriuOp>(std::vector{a}, out, diagonal);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> maskedFill(std::shared_ptr<TensorImpl> a,
+                                       std::shared_ptr<TensorImpl> mask,
+                                       float val) {
+  if (mask->m_requiresGrad) {
+    throw std::runtime_error(
+        "It is invalid for the mask to require a gradient");
+  }
+  auto target_shape_opt = getBroadcastShape(a->m_shape, mask->m_shape);
+  if (!target_shape_opt || a->m_shape != *target_shape_opt) {
+    throw std::runtime_error("The mask cannot be broadcasted to the input");
+  }
+  auto mask_bc = (mask->m_shape == *target_shape_opt)
+                     ? mask
+                     : broadcast(mask, *target_shape_opt);
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseBinaryKernel(out, a, mask_bc,
+                          [&](float a, float b) { return b == 1 ? val : a; });
+  out->m_requiresGrad = GradMode::enabled && a->m_requiresGrad;
+  if (out->m_requiresGrad) {
+    out->m_creator =
+        std::make_unique<MaskedFillOp>(std::vector{a, mask}, out, val);
+  }
+  return out;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

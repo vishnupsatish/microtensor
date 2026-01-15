@@ -192,5 +192,43 @@ int main() {
     b.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 26
+  {
+    auto a = Tensor(Shape{3, 3}, std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9});
+    a.triu(0).dumpTensor(std::cout);
+    a.triu(1).dumpTensor(std::cout);
+    a.triu(-1).dumpTensor(std::cout);
+  }
+
+  // Test 27
+  {
+    auto a = Tensor(Shape{2, 3, 3}, std::vector<float>(18, 1.0f), true);
+    auto b = a.triu(1);
+    auto c = b.reduceSum({0, 1, 2}, false);
+    c.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 28
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1, 2, 3, 4}, true);
+    auto mask = Tensor(Shape{2, 2}, std::vector<float>{0, 1, 1, 0});
+    auto b = a.maskedFill(mask, -1e9);
+    b.dumpTensor(std::cout);
+    b.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 29
+  {
+    auto a = Tensor(Shape{3, 3}, std::vector<float>(9, 1.0f), true);
+    auto ones = Tensor(Shape{3, 3}, std::vector<float>(9, 1.0f));
+    auto mask = ones.triu(1);
+    auto b = a.maskedFill(mask, -1e9);
+    b.dumpTensor(std::cout);
+    b.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }

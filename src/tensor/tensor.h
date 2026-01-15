@@ -52,6 +52,8 @@ class Tensor {
   Tensor slice(const std::vector<int>& start, const Shape& size);
   Tensor relu();
   Tensor softmax(int dim);
+  Tensor triu(int diagonal = 0);
+  Tensor maskedFill(const Tensor& mask, float val);
 
   // In-place operations.
   Tensor& operator-=(const Tensor& other);

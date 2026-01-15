@@ -101,6 +101,12 @@ Tensor Tensor::relu() { return Tensor(::relu(m_impl)); }
 
 Tensor Tensor::softmax(int dim) { return Tensor(::softmax(m_impl, dim)); }
 
+Tensor Tensor::triu(int diagonal) { return Tensor(::triu(m_impl, diagonal)); }
+
+Tensor Tensor::maskedFill(const Tensor& mask, float val) {
+  return Tensor(::maskedFill(m_impl, mask.m_impl, val));
+}
+
 Tensor& Tensor::operator-=(const Tensor& other) {
   subtract_(m_impl, other.m_impl);
   return *this;
