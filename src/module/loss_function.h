@@ -8,3 +8,5 @@
 #include "tensor.h"
 
 Tensor meanSquaredError(Tensor inp, Tensor target);
+
+Tensor crossEntropy(Tensor inp, Tensor target);

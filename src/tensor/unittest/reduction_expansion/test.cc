@@ -230,5 +230,46 @@ int main() {
     a.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 30
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto idx = Tensor(Shape{2, 2}, std::vector<float>{0, 2, 1, 1});
+    a.gather(1, idx).dumpTensor(std::cout);
+  }
+
+  // Test 31
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto idx = Tensor(Shape{1, 3}, std::vector<float>{1, 0, 1});
+    a.gather(0, idx).dumpTensor(std::cout);
+  }
+
+  // Test 32
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6}, true);
+    auto idx = Tensor(Shape{2, 2}, std::vector<float>{0, 2, 1, 1});
+    auto b = a.gather(1, idx);
+    b.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 33
+  {
+    auto a = Tensor(Shape{1, 3}, std::vector<float>{1, 2, 3}, true);
+    auto idx = Tensor(Shape{1, 4}, std::vector<float>{0, 0, 0, 0});
+    auto b = a.gather(1, idx);
+    b.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 34
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{1, 2, 3, 4}, true);
+    auto idx = Tensor(Shape{2, 1}, std::vector<float>{1, 0});
+    auto b = a.softmax(1).gather(1, idx);
+    b.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }

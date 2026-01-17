@@ -88,7 +88,12 @@ std::shared_ptr<TensorImpl> slice(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a);
 
+std::shared_ptr<TensorImpl> geluApprox(std::shared_ptr<TensorImpl> a);
+
 std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim);
+
+std::shared_ptr<TensorImpl> gather(std::shared_ptr<TensorImpl> a, int dimInput,
+                                   std::shared_ptr<TensorImpl> index);
 
 // Keeps upper triangular part of the matrix. Positive diagonal value: how many
 // diagonals to exclude above the main diagonal.

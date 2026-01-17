@@ -9,8 +9,7 @@
 #include <memory>
 #include <vector>
 
-// TODO: this might be a problem... exposing all these operation methods and
-// also exposing TensorImpl
+// TODO: exposing all operation methods and also exposing TensorImpl...
 #include "private/operation.h"
 #include "private/tensor_impl.h"
 
@@ -99,12 +98,18 @@ Tensor Tensor::slice(const std::vector<int>& start, const Shape& size) {
 
 Tensor Tensor::relu() { return Tensor(::relu(m_impl)); }
 
+Tensor Tensor::gelu() { return Tensor(::geluApprox(m_impl)); }
+
 Tensor Tensor::softmax(int dim) { return Tensor(::softmax(m_impl, dim)); }
 
 Tensor Tensor::triu(int diagonal) { return Tensor(::triu(m_impl, diagonal)); }
 
 Tensor Tensor::maskedFill(const Tensor& mask, float val) {
   return Tensor(::maskedFill(m_impl, mask.m_impl, val));
+}
+
+Tensor Tensor::gather(int dim, const Tensor& index) {
+  return Tensor(::gather(m_impl, dim, index.m_impl));
 }
 
 Tensor& Tensor::operator-=(const Tensor& other) {

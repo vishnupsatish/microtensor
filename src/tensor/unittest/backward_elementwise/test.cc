@@ -158,5 +158,14 @@ int main() {
     b.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 16
+  {
+    auto a =
+        Tensor(Shape{2, 2}, std::vector<float>{-2.0, -1.0, 1.0, 2.0}, true);
+    auto b = a.gelu();
+    b.backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }

@@ -67,6 +67,11 @@ def run():
     b13 = torch.tensor([[2.0, 3.0], [4.0, 5.0]], dtype=torch.float32)
     results.append((torch.exp(a13) * torch.log(b13) - torch.pow(a13, 0.5)).detach().numpy())
 
+    # Test 14
+    import torch.nn.functional as F
+    a14 = torch.tensor([[-2.0, -1.0], [1.0, 2.0]], dtype=torch.float32)
+    results.append(F.gelu(a14, approximate='tanh').detach().numpy())
+
     return results
 
 if __name__ == "__main__":

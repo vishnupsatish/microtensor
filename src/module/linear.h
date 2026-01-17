@@ -8,9 +8,10 @@
 #include "module.h"
 
 class Linear : public Module {
-  Tensor w, b;
+  Tensor m_weight;
+  Tensor m_bias;
 
  public:
-  Linear(int inFeatures, int outFeatures);
+  Linear(int inFeatures, int outFeatures, bool bias = true);
   Tensor forward(Tensor inp);
 };

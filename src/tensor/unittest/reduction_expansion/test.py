@@ -86,11 +86,11 @@ def run():
     b16.backward(torch.ones_like(b16))
     results.append(a16.grad.numpy())
 
-    # Test 17: Forward reduceMax with tied maximum values
+    # Test 17
     a17 = torch.tensor([[5, 2], [5, 4], [1, 4]], dtype=torch.float32)
     results.append(torch.max(a17, dim=0, keepdim=False).values.numpy())
 
-    # Test 18: (a + b).reduceMax(0) * c
+    # Test 18
     a18 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
     b18 = torch.tensor([[10, 20], [30, 40]], dtype=torch.float32, requires_grad=True)
     c18 = torch.tensor([0.5, 0.5], dtype=torch.float32, requires_grad=True)
@@ -100,7 +100,7 @@ def run():
     results.append(b18.grad.numpy())
     results.append(c18.grad.numpy())
 
-    # Test 19: (a.reduceMax(1) - b).pow(2.0)
+    # Test 19
     a19 = torch.tensor([[1, 5], [6, 3], [2, 4]], dtype=torch.float32, requires_grad=True)
     b19 = torch.tensor([1, 1, 1], dtype=torch.float32, requires_grad=True)
     res19 = torch.pow(torch.max(a19, dim=1, keepdim=False).values - b19, 2.0)
@@ -108,22 +108,22 @@ def run():
     results.append(a19.grad.numpy())
     results.append(b19.grad.numpy())
 
-    # Test 20: Basic 1D Softmax Forward
+    # Test 20
     a20 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
     b20 = F.softmax(a20, dim=0)
     results.append(b20.detach().numpy())
 
-    # Test 21: 2D Softmax Forward along dim 0
+    # Test 21
     a21 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
     b21 = F.softmax(a21, dim=0)
     results.append(b21.detach().numpy())
 
-    # Test 22: 2D Softmax Forward along dim 1
+    # Test 22
     a22 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32)
     b22 = F.softmax(a22, dim=1)
     results.append(b22.detach().numpy())
 
-    # Test 23: Softmax Backward 1D
+    # Test 23
     a23 = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32, requires_grad=True)
     b23 = F.softmax(a23, dim=0)
     c23 = b23 * torch.tensor([0.1, 0.2, 0.3], dtype=torch.float32)
@@ -131,14 +131,14 @@ def run():
     d23.backward()
     results.append(a23.grad.numpy())
 
-    # Test 24: Softmax Backward 2D dim 1
+    # Test 24
     a24 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32, requires_grad=True)
     b24 = F.softmax(a24, dim=1)
     c24 = b24.sum()
     c24.backward()
     results.append(a24.grad.numpy())
 
-    # Test 25: Complex chain with Softmax
+    # Test 25
     a25 = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32, requires_grad=True)
     b25 = torch.tensor([[0.5, 1.5], [2.5, 3.5]], dtype=torch.float32, requires_grad=True)
     res25 = F.log_softmax(a25 + b25, dim=1).sum()
@@ -146,20 +146,20 @@ def run():
     results.append(a25.grad.numpy())
     results.append(b25.grad.numpy())
 
-    # Test 26: triu forward
+    # Test 26
     a26 = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=torch.float32)
     results.append(torch.triu(a26, diagonal=0).numpy())
     results.append(torch.triu(a26, diagonal=1).numpy())
     results.append(torch.triu(a26, diagonal=-1).numpy())
 
-    # Test 27: triu backward
+    # Test 27
     a27 = torch.ones((2, 3, 3), dtype=torch.float32, requires_grad=True)
     b27 = torch.triu(a27, diagonal=1)
     c27 = b27.sum()
     c27.backward()
     results.append(a27.grad.numpy())
 
-    # Test 28: maskedFill basic
+    # Test 28
     a28 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
     mask28 = torch.tensor([[0, 1], [1, 0]], dtype=torch.float32)
     b28 = torch.masked_fill(a28, mask28 == 1, -1e9)
@@ -167,13 +167,44 @@ def run():
     b28.sum().backward()
     results.append(a28.grad.numpy())
 
-    # Test 29: Causal mask style
+    # Test 29
     a29 = torch.ones((3, 3), dtype=torch.float32, requires_grad=True)
     mask29 = torch.triu(torch.ones((3, 3)), diagonal=1)
     b29 = torch.masked_fill(a29, mask29 == 1, -1e9)
     results.append(b29.detach().numpy())
     b29.sum().backward()
     results.append(a29.grad.numpy())
+
+    # Test 30
+    a30 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+    idx30 = torch.tensor([[0, 2], [1, 1]], dtype=torch.int64)
+    results.append(torch.gather(a30, 1, idx30).numpy())
+
+    # Test 31
+    a31 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+    idx31 = torch.tensor([[1, 0, 1]], dtype=torch.int64)
+    results.append(torch.gather(a31, 0, idx31).numpy())
+
+    # Test 32
+    a32 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32, requires_grad=True)
+    idx32 = torch.tensor([[0, 2], [1, 1]], dtype=torch.int64)
+    b32 = torch.gather(a32, 1, idx32)
+    b32.sum().backward()
+    results.append(a32.grad.numpy())
+
+    # Test 33
+    a33 = torch.tensor([[1, 2, 3]], dtype=torch.float32, requires_grad=True)
+    idx33 = torch.tensor([[0, 0, 0, 0]], dtype=torch.int64)
+    b33 = torch.gather(a33, 1, idx33)
+    b33.sum().backward()
+    results.append(a33.grad.numpy())
+
+    # Test 34
+    a34 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
+    idx34 = torch.tensor([[1], [0]], dtype=torch.int64)
+    b34 = torch.gather(F.softmax(a34, dim=1), 1, idx34)
+    b34.sum().backward()
+    results.append(a34.grad.numpy())
 
     return results
 

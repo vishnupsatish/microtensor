@@ -11,7 +11,6 @@
 #include "private/shape.h"
 #include "private/tensor_impl.h"
 
-// Lightweight object that is a wrapper around a `TensorImpl`.
 class Tensor {
   std::shared_ptr<TensorImpl> m_impl;
 
@@ -51,9 +50,11 @@ class Tensor {
   Tensor makeContiguous();
   Tensor slice(const std::vector<int>& start, const Shape& size);
   Tensor relu();
+  Tensor gelu();
   Tensor softmax(int dim);
   Tensor triu(int diagonal = 0);
   Tensor maskedFill(const Tensor& mask, float val);
+  Tensor gather(int dim, const Tensor& index);
 
   // In-place operations.
   Tensor& operator-=(const Tensor& other);

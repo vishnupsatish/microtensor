@@ -125,6 +125,13 @@ def run():
     results.append(a15.grad.numpy())
     results.append(b15.grad.numpy())
 
+    # Test 16
+    import torch.nn.functional as F
+    a16 = torch.tensor([[-2.0, -1.0], [1.0, 2.0]], dtype=torch.float32, requires_grad=True)
+    res16 = F.gelu(a16, approximate='tanh')
+    res16.backward(torch.ones_like(res16))
+    results.append(a16.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

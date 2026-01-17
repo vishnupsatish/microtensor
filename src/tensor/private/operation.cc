@@ -435,6 +435,66 @@ class TriuOp : public Operation {
   }
 };
 
+class GeluOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    auto input = m_parents[0];
+    auto res = std::make_shared<TensorImpl>(input->m_shape);
+    const float sqrt2Pi = 0.7978845608f;
+    const float coeff = 0.044715f;
+    elementwiseBinaryKernel(res, input, grad_output, [&](float x, float g_out) {
+      float x2 = x * x;
+      float x3 = x2 * x;
+      float inner = sqrt2Pi * (x + coeff * x3);
+      float t = std::tanh(inner);
+      float g_prime = sqrt2Pi * (1.0f + 3.0f * coeff * x2);
+      float sech2 = 1.0f - t * t;
+      float derivative = 0.5f * (1.0f + t) + 0.5f * x * sech2 * g_prime;
+      return g_out * derivative;
+    });
+    return {res};
+  }
+};
+
+class GatherOp : public Operation {
+  int m_dim;
+
+ public:
+  GatherOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+           std::shared_ptr<TensorImpl> output, int dim)
+      : Operation(std::move(parents), output), m_dim{dim} {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    auto& inp = m_parents[0];
+    auto& idx = m_parents[1];
+    auto out = std::make_shared<TensorImpl>(inp->m_shape);
+    out->fillRandom([]() { return 0; });
+    std::vector<size_t> coords(inp->getRank());
+    size_t totalElements = sizeFromShape(idx->m_shape);
+    for (int i = 0; i < totalElements; ++i) {
+      size_t idxOffset =
+          getPhysicalOffset(coords, idx->m_strides, idx->m_offset);
+      size_t gradOffset = getPhysicalOffset(coords, grad_output->m_strides,
+                                            grad_output->m_offset);
+      // Where the value comes from (and gradient should go).
+      size_t val = static_cast<size_t>((*idx->m_data)[idxOffset]);
+      size_t outOffset =
+          getPhysicalOffset(coords, out->m_strides, out->m_offset);
+      outOffset -= coords[m_dim] * out->m_strides[m_dim];
+      outOffset += val * out->m_strides[m_dim];
+      (*out->m_data)[outOffset] += (*grad_output->m_data)[gradOffset];
+      incrementCoords(coords, idx->m_shape);
+    }
+    return {out, nullptr};
+  }
+};
+
 class MaskedFillOp : public Operation {
   float m_val;
 
@@ -959,17 +1019,68 @@ std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a) {
   return out;
 }
 
+std::shared_ptr<TensorImpl> geluApprox(std::shared_ptr<TensorImpl> a) {
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  const float sqrt2Pi = 0.7978845608f;
+  const float coeff = 0.044715f;
+
+  elementwiseUnaryKernel(out, a, [=](float x) {
+    float x3 = x * x * x;
+    return 0.5f * x * (1.0f + std::tanh(sqrt2Pi * (x + coeff * x3)));
+  });
+
+  out->m_requiresGrad = GradMode::enabled && a->m_requiresGrad;
+  if (out->m_requiresGrad) {
+    out->m_creator = std::make_unique<GeluOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
 std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim) {
   // Do not need to have a specific SoftmaxOp since it is a combination of
   // several operations that have their own backward passes defined, so it will
   // just work.
   // In the future, this should be implemented as a fused kernel for better
-  // numerical stability.
+  // numerical stability (in which case we need a SoftmaxOp).
   auto mx = reduceMax(a, dim, true);
   auto shifted = subtract(a, mx);
   auto expA = exp(shifted);
   auto sumExp = reduceSum(expA, {dim}, true);
   return divide(expA, sumExp);
+}
+
+std::shared_ptr<TensorImpl> gather(std::shared_ptr<TensorImpl> a, int dimInput,
+                                   std::shared_ptr<TensorImpl> index) {
+  if (a->getRank() != index->getRank()) {
+    throw std::runtime_error{"Ranks of input and index tensors must be equal"};
+  }
+  if (index->m_requiresGrad) {
+    throw std::runtime_error{"Index tensor cannot require a gradient"};
+  }
+  int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
+  size_t totalElements = sizeFromShape(index->m_shape);
+  auto out = std::make_shared<TensorImpl>(index->m_shape);
+  std::vector<size_t> coords(a->getRank());
+  for (int i = 0; i < totalElements; ++i) {
+    size_t offset =
+        getPhysicalOffset(coords, index->m_strides, index->m_offset);
+    // TODO: If it's a negative float value we should throw an error.
+    int val = static_cast<int>((*index->m_data)[offset]);
+    // e.g., input[index[i][j][k]][j][k] if dim == 0, and in rank 3
+    // TODO: is this ok being a size_t?
+    size_t inputOffset = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    inputOffset -= coords[dim] * a->m_strides[dim];
+    inputOffset += val * a->m_strides[dim];
+    size_t resOffset = getPhysicalOffset(coords, out->m_strides, out->m_offset);
+    (*out->m_data)[resOffset] = (*a->m_data)[inputOffset];
+    incrementCoords(coords, index->m_shape);
+  }
+  out->m_requiresGrad = GradMode::enabled && a->m_requiresGrad;
+  if (out->m_requiresGrad) {
+    out->m_creator =
+        std::make_unique<GatherOp>(std::vector{a, index}, out, dim);
+  }
+  return out;
 }
 
 std::shared_ptr<TensorImpl> triu(std::shared_ptr<TensorImpl> a, int diagonal) {

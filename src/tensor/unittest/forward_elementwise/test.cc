@@ -96,5 +96,11 @@ int main() {
     res.dumpTensor(std::cout);
   }
 
+  // Test 14
+  {
+    auto a = Tensor(Shape{2, 2}, std::vector<float>{-2.0, -1.0, 1.0, 2.0});
+    a.gelu().dumpTensor(std::cout);
+  }
+
   return 0;
 }
