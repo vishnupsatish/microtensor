@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "grad_mode.h"
-#include "linear.h"
+#include "layers.h"
 #include "loss_function.h"
 #include "optimizer.h"
 #include "random_gen.h"

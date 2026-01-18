@@ -61,6 +61,7 @@ AdamW::AdamW(std::vector<Tensor> parameters, float learningRate, float beta1,
 void AdamW::step() {
   // Note: following the algorithm provided in
   // https://docs.pytorch.org/docs/stable/generated/torch.optim.AdamW.html.
+  // I have no idea how this works.
   NoGrad guard;
   float m_b1Corr = std::pow(m_beta1, m_t);
   float m_b2Corr = std::pow(m_beta2, m_t);

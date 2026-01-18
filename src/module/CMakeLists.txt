@@ -4,8 +4,8 @@ add_library(Module
     module.cc
     optimizer.h
     optimizer.cc
-    linear.h
-    linear.cc
+    layers.h
+    layers.cc
     loss_function.h
     loss_function.cc
     transformer.cc
