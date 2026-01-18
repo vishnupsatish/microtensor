@@ -206,6 +206,14 @@ def run():
     b34.sum().backward()
     results.append(a34.grad.numpy())
 
+    # Test 35
+    a35 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32)
+    results.append(torch.argmax(a35, dim=0, keepdim=False).to(torch.float32).numpy())
+
+    # Test 36
+    a36 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32)
+    results.append(torch.argmax(a36, dim=1, keepdim=True).to(torch.float32).numpy())
+
     return results
 
 if __name__ == "__main__":

@@ -86,6 +86,12 @@ Tensor Tensor::reduceMax(int dim, bool keep_dim) {
   return Tensor{::reduceMax(m_impl, dim, keep_dim)};
 }
 
+Tensor Tensor::argmax(int dim, bool keep_dim) {
+  return Tensor{::argmax(m_impl, dim, keep_dim)};
+}
+
+Tensor Tensor::argmax() { return Tensor{::argmax(m_impl)}; }
+
 Tensor Tensor::reshape(const Shape& shape) {
   return Tensor{::reshape(m_impl, shape)};
 }
@@ -110,6 +116,14 @@ Tensor Tensor::maskedFill(const Tensor& mask, float val) {
 
 Tensor Tensor::gather(int dim, const Tensor& index) {
   return Tensor(::gather(m_impl, dim, index.m_impl));
+}
+
+float Tensor::item() const {
+  if (sizeFromShape(m_impl->m_shape) != 1) {
+    throw std::runtime_error(
+        "item() can only be called on tensors with 1 element");
+  }
+  return (*m_impl->m_data)[m_impl->m_offset];
 }
 
 Tensor& Tensor::operator-=(const Tensor& other) {

@@ -271,5 +271,17 @@ int main() {
     a.getGrad().dumpTensor(std::cout);
   }
 
+  // Test 35
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 6, 3, 4, 5, 2});
+    a.argmax(0, false).dumpTensor(std::cout);
+  }
+
+  // Test 36
+  {
+    auto a = Tensor(Shape{3, 2}, std::vector<float>{1, 6, 3, 4, 5, 2});
+    a.argmax(1, true).dumpTensor(std::cout);
+  }
+
   return 0;
 }

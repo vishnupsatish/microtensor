@@ -34,7 +34,7 @@ class XOR : public Module {
 
 int main() {
   RNG::setSeed(42);
-  auto model = XOR{};
+  XOR model{};
   // We can use AdamW now!!!
   auto opt = AdamW{model.getParameters(), 0.01, 0.9, 0.999, 1e-8, 0.01};
   // auto opt = SGD{model.getParameters(), 0.01};

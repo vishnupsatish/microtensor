@@ -19,7 +19,7 @@ class SelfAttention : public Module {
   std::unique_ptr<Linear> m_outProj;
 
  public:
-  SelfAttention(size_t embeddingSize, size_t numHeads = 12);
+  SelfAttention(size_t embeddingSize, size_t numHeads = 8);
   Tensor forward(Tensor x);
 };
 

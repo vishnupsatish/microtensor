@@ -39,7 +39,7 @@ Tensor GPT2::forward(Tensor x) {
   for (float x : std::views::iota(0U, x.getShape()[1])) {
     posInit.push_back(x);
   }
-  Tensor posIdx{Shape{m_maxSequenceLength}, posInit};
+  Tensor posIdx{Shape{x.getShape()[1]}, posInit};
   auto inp = m_token.forward(x) + m_pos.forward(posIdx);
   for (int i = 0; i < 12; ++i) {
     inp = m_transformers[i].forward(inp);

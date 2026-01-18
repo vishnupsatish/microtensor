@@ -28,6 +28,7 @@ class Tensor {
   void dumpTensor(std::ostream& os);
   Tensor getGrad() const;
   Shape getShape() const;
+  float item() const;
 
   // Operations that create new Tensors and also create DAG nodes.
   Tensor operator+(const Tensor& other);
@@ -46,6 +47,8 @@ class Tensor {
   Tensor broadcast(const Shape& target);
   Tensor reduceSum(const std::vector<int>& dims, bool keep_dims = false);
   Tensor reduceMax(int dim, bool keep_dim = false);
+  Tensor argmax(int dim, bool keep_dim = false);
+  Tensor argmax();
   Tensor reshape(const Shape& shape);
   Tensor makeContiguous();
   Tensor slice(const std::vector<int>& start, const Shape& size);

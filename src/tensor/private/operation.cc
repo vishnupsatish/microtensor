@@ -952,6 +952,57 @@ std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
   return out;
 }
 
+std::shared_ptr<TensorImpl> argmax(std::shared_ptr<TensorImpl> a, int dimInput,
+                                   bool keep_dim) {
+  Shape outShape = a->m_shape;
+  int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput;
+  outShape[dim] = 1;
+  auto out = std::make_shared<TensorImpl>(outShape);
+
+  std::vector<float> maxVal(sizeFromShape(outShape),
+                            -std::numeric_limits<float>::infinity());
+  auto broadcast_strides = getBroadcastStrides(out, a->m_shape);
+
+  size_t total_elements = sizeFromShape(a->m_shape);
+  std::vector<size_t> coords(a->getRank(), 0);
+
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset = getPhysicalOffset(coords, broadcast_strides, out->m_offset);
+    size_t offset_out = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    if ((*a->m_data)[offset_out] > maxVal[offset]) {
+      maxVal[offset] = (*a->m_data)[offset_out];
+      (*out->m_data)[offset] = static_cast<float>(coords[dim]);
+    }
+    incrementCoords(coords, a->m_shape);
+  }
+  out->m_requiresGrad = false;
+  if (!keep_dim) {
+    out = squeeze(out, {dim});
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> argmax(std::shared_ptr<TensorImpl> a) {
+  size_t total_elements = sizeFromShape(a->m_shape);
+  float maxVal = -std::numeric_limits<float>::infinity();
+  float maxIdx = 0;
+
+  std::vector<size_t> coords(a->getRank(), 0);
+  for (size_t i = 0; i < total_elements; ++i) {
+    size_t offset = getPhysicalOffset(coords, a->m_strides, a->m_offset);
+    if ((*a->m_data)[offset] > maxVal) {
+      maxVal = (*a->m_data)[offset];
+      maxIdx = static_cast<float>(i);
+    }
+    incrementCoords(coords, a->m_shape);
+  }
+
+  auto out = std::make_shared<TensorImpl>(Shape{});
+  (*out->m_data)[0] = maxIdx;
+  out->m_requiresGrad = false;
+  return out;
+}
+
 std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a) {
   if (a->isContiguous()) {
     return a;

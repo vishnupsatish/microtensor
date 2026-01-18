@@ -12,3 +12,6 @@ add_subdirectory(tensor)
 add_subdirectory(module)
 add_subdirectory(util)
 add_subdirectory(models)
+
+# Copy text.txt to the root build directory (hack...)
+configure_file(models/gpt2/text.txt ${CMAKE_BINARY_DIR}/text.txt COPYONLY)

@@ -78,6 +78,11 @@ std::shared_ptr<TensorImpl> reduceSum(std::shared_ptr<TensorImpl> a,
 std::shared_ptr<TensorImpl> reduceMax(std::shared_ptr<TensorImpl> a,
                                       int dimInput, bool keep_dim);
 
+std::shared_ptr<TensorImpl> argmax(std::shared_ptr<TensorImpl> a, int dimInput,
+                                   bool keep_dim);
+
+std::shared_ptr<TensorImpl> argmax(std::shared_ptr<TensorImpl> a);
+
 std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a);
 
 std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,

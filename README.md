@@ -1,7 +1,5 @@
 # MicroTensor – Small DL Library in C++
 
-Inspired by some of the things I worked on and saw colleagues work on at Huawei.
-
 No external dependencies.
 
 ### Goals

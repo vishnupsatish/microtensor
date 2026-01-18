@@ -33,7 +33,7 @@ void SGD::step() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<Tensor> initializeMoment(const std::vector<Tensor> parameters) {
+std::vector<Tensor> initializeMoment(const std::vector<Tensor>& parameters) {
   std::vector<Tensor> moments;
   for (auto& p : parameters) {
     size_t elements = sizeFromShape(p.getShape());
