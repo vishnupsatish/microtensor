@@ -80,7 +80,7 @@ void TensorImpl::accumulateGrad(std::shared_ptr<TensorImpl> new_grad) {
   if (!m_grad) {
     m_grad = new_grad;
   } else {
-    m_grad = add(m_grad, new_grad);
+    add_(m_grad, new_grad);
   }
 }
 
@@ -122,9 +122,6 @@ void TensorImpl::backward() {
       }
 
       auto calculated_grad = inp_grads[i];
-      // Very inefficient; allocates new memory for m_grad every time
-      // we accumulate gradient. This is very suboptimal. Need to have an
-      // in-place gradient accumulation kernel.
       input->accumulateGrad(calculated_grad);
     }
   }

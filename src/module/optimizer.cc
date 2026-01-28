@@ -59,9 +59,8 @@ AdamW::AdamW(std::vector<Tensor> parameters, float learningRate, float beta1,
       m_moment2{initializeMoment(m_parameters)} {}
 
 void AdamW::step() {
-  // Note: following the algorithm provided in
+  // Following the algorithm provided in
   // https://docs.pytorch.org/docs/stable/generated/torch.optim.AdamW.html.
-  // I have no idea how this works.
   NoGrad guard;
   float m_b1Corr = std::pow(m_beta1, m_t);
   float m_b2Corr = std::pow(m_beta2, m_t);
@@ -71,12 +70,18 @@ void AdamW::step() {
     auto& m2 = m_moment2[i];
     auto g = param.getGrad();
     param -= param * m_learningRate * m_weightDecay;
-    // TODO: make these in-place operations.
-    m1 = m1 * m_beta1 + g * (1 - m_beta1);
-    m2 = m2 * m_beta2 + g.pow(2) * (1 - m_beta2);
+    m1 *= m_beta1;
+    m1 += g * (1 - m_beta1);
+    m2 *= m_beta2;
+    m2 += g.pow(2) * (1 - m_beta2);
     auto m1Hat = m1 / (1 - m_b1Corr);
     auto m2Hat = m2 / (1 - m_b2Corr);
-    param -= (m1Hat * m_learningRate) / (m2Hat.pow(0.5) + m_epsilon);
+    // In-place operations to avoid allocating memory.
+    m1Hat *= m_learningRate;
+    m2Hat.pow_(0.5);
+    m2Hat += m_epsilon;
+    m1Hat /= m2Hat;
+    param -= m1Hat;
   }
   ++m_t;
 }

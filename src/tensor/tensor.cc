@@ -96,7 +96,9 @@ Tensor Tensor::reshape(const Shape& shape) {
   return Tensor{::reshape(m_impl, shape)};
 }
 
-Tensor Tensor::makeContiguous() { return Tensor{::makeContiguous(m_impl)}; }
+Tensor Tensor::makeContiguous() const {
+  return Tensor{::makeContiguous(m_impl)};
+}
 
 Tensor Tensor::slice(const std::vector<int>& start, const Shape& size) {
   return Tensor{::slice(m_impl, start, size)};
@@ -126,8 +128,48 @@ float Tensor::item() const {
   return (*m_impl->m_data)[m_impl->m_offset];
 }
 
+std::vector<float> Tensor::data() const {
+  auto cont = ::makeContiguous(m_impl);
+  return *(cont->m_data);
+}
+
 Tensor& Tensor::operator-=(const Tensor& other) {
   subtract_(m_impl, other.m_impl);
+  return *this;
+}
+
+Tensor& Tensor::operator+=(const Tensor& other) {
+  add_(m_impl, other.m_impl);
+  return *this;
+}
+
+Tensor& Tensor::operator+=(float other) {
+  add_(m_impl, other);
+  return *this;
+}
+
+Tensor& Tensor::operator*=(const Tensor& other) {
+  multiply_(m_impl, other.m_impl);
+  return *this;
+}
+
+Tensor& Tensor::operator*=(float other) {
+  multiply_(m_impl, other);
+  return *this;
+}
+
+Tensor& Tensor::operator/=(const Tensor& other) {
+  divide_(m_impl, other.m_impl);
+  return *this;
+}
+
+Tensor& Tensor::operator/=(float other) {
+  divide_(m_impl, other);
+  return *this;
+}
+
+Tensor& Tensor::pow_(float exp) {
+  ::pow_(m_impl, exp);
   return *this;
 }
 

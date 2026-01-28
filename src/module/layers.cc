@@ -18,14 +18,16 @@ Linear::Linear(int inFeaturesInp, int outFeaturesInp, bool bias) {
   size_t outFeatures = outFeaturesInp;
   m_weight = Tensor{Shape{outFeatures, inFeatures}, true};
   float sk = std::sqrt(1.0f / inFeatures);
-  auto fn = std::uniform_real_distribution<float>{-sk, sk};
+  // auto fn = std::uniform_real_distribution<float>{-sk, sk};
+  auto fn = std::normal_distribution<float>{0, 0.02};
   auto init = std::bind_front(fn, RNG::get());
   m_weight.fillRandom(init);
   insertParameter(m_weight);
 
   if (bias) {
     m_bias = Tensor{Shape{outFeatures}, true};
-    m_bias.fillRandom(init);
+    // m_bias.fillRandom(init);
+    m_bias.fillRandom([]() { return 0; });
     insertParameter(m_bias);
   }
 }
@@ -49,7 +51,9 @@ Embedding::Embedding(int vocabSize, int embeddingSize) {
   size_t es = embeddingSize;
   m_embedding = Tensor{Shape{vs, es}, true};
   // PyTorch initialization.
-  auto fn = std::normal_distribution<float>{0, 1};
+  // auto fn = std::normal_distribution<float>{0, 1};
+  // TEMP.
+  auto fn = std::normal_distribution<float>{0, 0.02};
   auto init = std::bind_front(fn, RNG::get());
   m_embedding.fillRandom(init);
   insertParameter(m_embedding);

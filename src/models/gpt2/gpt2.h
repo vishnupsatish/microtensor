@@ -13,14 +13,14 @@
 class GPT2 : public Module {
   size_t m_maxSequenceLength;
   // Token embeddings
-  Embedding m_token;
+  std::unique_ptr<Embedding> m_token;
   // Positional embeddings
-  Embedding m_pos;
-  std::vector<TransformerBlock> m_transformers;
-  LayerNorm m_ln;
+  std::unique_ptr<Embedding> m_pos;
+  std::vector<std::unique_ptr<TransformerBlock>> m_transformers;
+  std::unique_ptr<LayerNorm> m_ln;
 
   // Should be weight-tied to m_token but is not...
-  Linear m_revEmb;
+  std::unique_ptr<Linear> m_revEmb;
 
  public:
   GPT2(int vocabSize, int maxSequenceLength, int embeddingSize);

@@ -14,6 +14,10 @@ add_library(Tensor
     private/kernels.ipp
 )
 
+find_package(OpenMP REQUIRED)
+
+target_link_libraries(Tensor PUBLIC OpenMP::OpenMP_CXX)
+
 target_include_directories(Tensor
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}

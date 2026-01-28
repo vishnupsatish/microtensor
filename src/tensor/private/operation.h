@@ -110,3 +110,17 @@ std::shared_ptr<TensorImpl> maskedFill(std::shared_ptr<TensorImpl> a,
                                        float val);
 
 void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);
+
+void add_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);
+
+void add_(std::shared_ptr<TensorImpl> a, float b);
+
+void multiply_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);
+
+void multiply_(std::shared_ptr<TensorImpl> a, float b);
+
+void divide_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b);
+
+void divide_(std::shared_ptr<TensorImpl> a, float b);
+
+void pow_(std::shared_ptr<TensorImpl> a, float exp);

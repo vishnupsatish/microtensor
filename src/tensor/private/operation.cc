@@ -532,74 +532,6 @@ std::pair<std::shared_ptr<TensorImpl>, std::shared_ptr<TensorImpl>> alignInputs(
   return {a_bc, b_bc};
 }
 
-// Performs C = A * B for a single matrix slice
-// Assumes pointers are already offset to the correct batch location
-void matmulKernel(float* ptr_c, const float* ptr_a, const float* ptr_b,
-                  size_t m, size_t k, size_t n, size_t stride_a_m,
-                  size_t stride_a_k,  // Strides for A's last 2 dims
-                  size_t stride_b_k,
-                  size_t stride_b_n,  // Strides for B's last 2 dims
-                  size_t stride_c_m,
-                  size_t stride_c_n  // Strides for C's last 2 dims
-) {
-  for (size_t i = 0; i < m; ++i) {    // rows of A
-    for (size_t j = 0; j < n; ++j) {  // columns of B
-
-      float sum = 0.0f;
-
-      for (size_t p = 0; p < k; ++p) {
-        float val_a = ptr_a[i * stride_a_m + p * stride_a_k];
-        float val_b = ptr_b[p * stride_b_k + j * stride_b_n];
-        sum += val_a * val_b;
-      }
-
-      ptr_c[i * stride_c_m + j * stride_c_n] = sum;
-    }
-  }
-}
-
-void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
-                   std::shared_ptr<TensorImpl> b) {
-  size_t rank = c->getRank();
-
-  size_t batch_rank = rank - 2;
-  size_t m = c->m_shape[rank - 2];
-  size_t n = c->m_shape[rank - 1];
-
-  size_t k = a->m_shape[rank - 1];
-
-  // Tracks where we are in the batch dims.
-  std::vector<size_t> current_coords(batch_rank, 0);
-  Shape batch_shape(c->m_shape.begin(), c->m_shape.end() - 2);
-
-  // Calculate total number of batches (e.g., 10 * 5 = 50)
-  size_t total_batches = 1;
-  for (size_t i = 0; i < batch_rank; ++i) total_batches *= batch_shape[i];
-
-  for (size_t batch = 0; batch < total_batches; ++batch) {
-    size_t offset_a = a->m_offset;
-    size_t offset_b = b->m_offset;
-    size_t offset_c = c->m_offset;
-
-    // Use the current coordinates to find the start of the data
-    for (size_t i = 0; i < batch_rank; ++i) {
-      offset_a += current_coords[i] * a->m_strides[i];
-      offset_b += current_coords[i] * b->m_strides[i];
-      offset_c += current_coords[i] * c->m_strides[i];
-    }
-
-    float* ptr_a = a->m_data->data() + offset_a;
-    float* ptr_b = b->m_data->data() + offset_b;
-    float* ptr_c = c->m_data->data() + offset_c;
-    matmulKernel(ptr_c, ptr_a, ptr_b, m, k, n, a->m_strides[rank - 2],
-                 a->m_strides[rank - 1], b->m_strides[rank - 2],
-                 b->m_strides[rank - 1], c->m_strides[rank - 2],
-                 c->m_strides[rank - 1]);
-
-    incrementCoords(current_coords, batch_shape);
-  }
-}
-
 bool isPermutation(const std::vector<size_t>& v) {
   int n = v.size();
   std::vector<bool> seen(n, false);
@@ -1215,5 +1147,61 @@ void subtract_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
         "Gradient must be disabled when performing in-place operations"};
   }
   auto b_bc = alignInputsForInPlace(a, b);
+  // Important: this has the potential to be wrong if a and b share the same
+  // memory. We could check if a and b share the same data, and if they do, then
+  // copy b. I think it is okay for the current use case, though.
   elementwiseBinaryKernel(a, a, b_bc, std::minus<float>());
+}
+
+void add_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
+  if (GradMode::enabled) {
+    throw std::runtime_error{
+        "Gradient must be disabled when performing in-place operations"};
+  }
+  auto b_bc = alignInputsForInPlace(a, b);
+  // See above for comment regarding correctness in the case of strided tensors.
+  elementwiseBinaryKernel(a, a, b_bc, std::plus<float>());
+}
+
+void add_(std::shared_ptr<TensorImpl> a, float b) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{b});
+  add_(a, cst);
+}
+
+void multiply_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
+  if (GradMode::enabled) {
+    throw std::runtime_error{
+        "Gradient must be disabled when performing in-place operations"};
+  }
+  auto b_bc = alignInputsForInPlace(a, b);
+  // See above for comment regarding correctness in the case of strided tensors.
+  elementwiseBinaryKernel(a, a, b_bc, std::multiplies<float>());
+}
+
+void multiply_(std::shared_ptr<TensorImpl> a, float b) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{b});
+  multiply_(a, cst);
+}
+
+void divide_(std::shared_ptr<TensorImpl> a, std::shared_ptr<TensorImpl> b) {
+  if (GradMode::enabled) {
+    throw std::runtime_error{
+        "Gradient must be disabled when performing in-place operations"};
+  }
+  auto b_bc = alignInputsForInPlace(a, b);
+  // See above for comment regarding correctness in the case of strided tensors.
+  elementwiseBinaryKernel(a, a, b_bc, std::divides<float>());
+}
+
+void divide_(std::shared_ptr<TensorImpl> a, float b) {
+  auto cst = make_shared<TensorImpl>(Shape{}, std::vector<float>{b});
+  divide_(a, cst);
+}
+
+void pow_(std::shared_ptr<TensorImpl> a, float exp) {
+  if (GradMode::enabled) {
+    throw std::runtime_error{
+        "Gradient must be disabled when performing in-place operations"};
+  }
+  elementwiseUnaryKernel(a, a, [&](float elt) { return std::pow(elt, exp); });
 }

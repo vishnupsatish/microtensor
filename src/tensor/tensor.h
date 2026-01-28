@@ -29,6 +29,7 @@ class Tensor {
   Tensor getGrad() const;
   Shape getShape() const;
   float item() const;
+  std::vector<float> data() const;
 
   // Operations that create new Tensors and also create DAG nodes.
   Tensor operator+(const Tensor& other);
@@ -50,7 +51,7 @@ class Tensor {
   Tensor argmax(int dim, bool keep_dim = false);
   Tensor argmax();
   Tensor reshape(const Shape& shape);
-  Tensor makeContiguous();
+  Tensor makeContiguous() const;
   Tensor slice(const std::vector<int>& start, const Shape& size);
   Tensor relu();
   Tensor gelu();
@@ -61,6 +62,13 @@ class Tensor {
 
   // In-place operations.
   Tensor& operator-=(const Tensor& other);
+  Tensor& operator+=(const Tensor& other);
+  Tensor& operator+=(float other);
+  Tensor& operator*=(const Tensor& other);
+  Tensor& operator*=(float other);
+  Tensor& operator/=(const Tensor& other);
+  Tensor& operator/=(float other);
+  Tensor& pow_(float exp);
 
   void backward();
 
