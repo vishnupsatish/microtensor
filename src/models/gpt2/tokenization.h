@@ -14,7 +14,7 @@
 using ByteSequence = std::vector<uint8_t>;
 
 // Indicates merge boundaries.
-using TrainingText = std::vector<ByteSequence>;
+using Text = std::vector<ByteSequence>;
 
 // Maps token -> sequence of bytes.
 using Vocabulary = std::vector<ByteSequence>;
@@ -28,7 +28,7 @@ using Merges = std::vector<std::pair<int, int>>;
 struct Tokenization {
   Vocabulary vocab;
   TokenMap tokenMap;
-  Merges mergesRules;
+  Merges merges;
 };
 
 // Helpers
@@ -38,6 +38,10 @@ std::string createStringFromByteSequence(const ByteSequence& seq);
 void emitTokenization(const Tokenization& bpe, std::ostream& os);
 Tokenization parseTokenization(std::istream& is);
 
-// Core BPE functions
-Tokenization train(TrainingText text, int vocabSize);
-std::vector<int> tokenize(const Tokenization& bpe, ByteSequence input);
+// Core BPE functions. For `train` and `tokenize`, the text must be
+// pre-tokenized, i.e., split up based on merge boundaries.
+Tokenization train(Text text, int vocabSize);
+std::vector<int> tokenize(const Tokenization& bpe, Text input);
+
+ByteSequence convertTokenizationToBytes(const Tokenization& bpe,
+                                        std::vector<int> tokenization);

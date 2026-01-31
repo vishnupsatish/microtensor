@@ -35,11 +35,17 @@ std::string createStringFromByteSequence(const ByteSequence& seq) {
 
 namespace {
 
+enum class BPEAction { Train, Tokenize };
+
 // Note: this is optimized for algorithmic efficiency, not practical efficiency.
 class BPETokenizationBuilder {
-  TrainingText m_text;
+  BPEAction m_action;
+
+  Text m_text;
 
   int m_vocabSize;
+
+  // If tokenizing, the below three should be treated as const.
   Vocabulary m_vocab;
   TokenMap m_tokenMap;
   Merges m_merges;
@@ -89,6 +95,7 @@ class BPETokenizationBuilder {
   // We use a std::set here because in the case of ties in pair frequency, we
   // will pick the pair with the smallest left token, then the smallest right
   // token.
+  // Note: in tokenize mode, this does not really need to be updated.
   std::map<int, std::set<TokenPair>, std::greater<>> m_numTokenPair;
 
   ////////////////////////////////////////////////////
@@ -180,6 +187,7 @@ class BPETokenizationBuilder {
   }
 
   void initializeVocab() {
+    assert(m_action == BPEAction::Train);
     assert(std::numeric_limits<uint8_t>::min() == 0);
     assert(std::numeric_limits<uint8_t>::max() == 255);
     for (int i = 0; i < 256; ++i) {
@@ -278,7 +286,8 @@ class BPETokenizationBuilder {
     m_tokenPairIndex.erase(pair);
   }
 
-  void mergeMostCommonPair() {
+  void mergeMostCommonPairUpdateVocab() {
+    assert(m_action == BPEAction::Train);
     assert(!m_numTokenPair.empty());
     assert(!m_numTokenPair.begin()->second.empty());
     // Out of the most common pairs, pick the first that we see.
@@ -305,8 +314,10 @@ class BPETokenizationBuilder {
   }
 
  public:
-  BPETokenizationBuilder(TrainingText text, int vocabSize)
-      : m_text{std::move(text)}, m_vocabSize{vocabSize} {
+  BPETokenizationBuilder(Text text, int vocabSize)
+      : m_action{BPEAction::Train},
+        m_text{std::move(text)},
+        m_vocabSize{vocabSize} {
     if (m_vocabSize < 256) {
       throw std::runtime_error{"Vocabulary size must be at least 256"};
     }
@@ -314,20 +325,67 @@ class BPETokenizationBuilder {
     createInitialPairs();
   }
 
+  BPETokenizationBuilder(Text text, const Tokenization& bpe)
+      : m_action{BPEAction::Tokenize},
+        m_text{std::move(text)},
+        m_vocab{bpe.vocab},
+        m_tokenMap{bpe.tokenMap},
+        m_merges{bpe.merges} {
+    createInitialPairs();
+  }
+
   Tokenization train() {
+    std::cout << "Starting training\n";
+    assert(m_action == BPEAction::Train);
     printDebug();
     while (m_vocab.size() < m_vocabSize && m_numTokenPair.size() >= 1) {
-      mergeMostCommonPair();
+      mergeMostCommonPairUpdateVocab();
       printDebug();
     }
     return {m_vocab, m_tokenMap, m_merges};
+  }
+
+  std::vector<int> tokenize() {
+    std::cout << "Starting tokenization\n";
+    assert(m_action == BPEAction::Tokenize);
+    printDebug();
+    for (const auto& [t1, t2] : m_merges) {
+      // Get the token number associated with the merged t1, t2.
+      const ByteSequence& t1Bytes = m_vocab[t1];
+      const ByteSequence& t2Bytes = m_vocab[t2];
+      ByteSequence newTokenBytes;
+      newTokenBytes.reserve(t1Bytes.size() + t2Bytes.size());
+      newTokenBytes.insert(newTokenBytes.end(), t1Bytes.begin(), t1Bytes.end());
+      newTokenBytes.insert(newTokenBytes.end(), t2Bytes.begin(), t2Bytes.end());
+
+      mergeTokens({t1, t2}, m_tokenMap[newTokenBytes]);
+    }
+    printDebug();
+    std::vector<int> tokens;
+    for (const auto& w : m_words) {
+      for (const auto& tokenLoc : w) {
+        tokens.push_back(tokenLoc.token);
+      }
+    }
+    return tokens;
   }
 };
 
 }  // namespace
 
-Tokenization train(TrainingText text, int vocabSize) {
+Tokenization train(Text text, int vocabSize) {
   return BPETokenizationBuilder{text, vocabSize}.train();
 }
 
-std::vector<int> tokenize(const Tokenization& bpe, ByteSequence input) {}
+std::vector<int> tokenize(const Tokenization& bpe, Text input) {
+  return BPETokenizationBuilder{input, bpe}.tokenize();
+}
+
+ByteSequence convertTokenizationToBytes(const Tokenization& bpe,
+                                        std::vector<int> tokenization) {
+  ByteSequence bytes;
+  for (auto token : tokenization) {
+    bytes.insert(bytes.end(), bpe.vocab[token].begin(), bpe.vocab[token].end());
+  }
+  return bytes;
+}

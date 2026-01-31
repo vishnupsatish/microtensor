@@ -4,17 +4,28 @@
  **/
 
 #include <iostream>
+#include <iterator>
 #include <string>
 
 #include "tokenization.h"
 
 int main() {
   // Testing tokenization.
-  std::string tok = "aaabdaaabac";
-  std::string tok2 = "ababababa";
+  std::vector<std::string> data = {"aaabdaaabac", "ababababa"};
+  Text trainingText;
+  std::transform(data.begin(), data.end(), std::back_inserter(trainingText),
+                 [&](const std::string& str) {
+                   return createByteSequenceFromString(str);
+                 });
 
-  auto byteSeq = createByteSequenceFromString(tok);
-  auto bs2 = createByteSequenceFromString(tok2);
-  TrainingText txt = {byteSeq, bs2};
-  train(txt, 261);
+  auto tokenization = train(trainingText, 261);
+
+  std::vector<std::string> tokenizeData = {"aaabdaaabac", "ababababa"};
+  Text tokenizeText;
+  std::transform(data.begin(), data.end(), std::back_inserter(tokenizeText),
+                 [&](const std::string& str) {
+                   return createByteSequenceFromString(str);
+                 });
+
+  auto tokens = tokenize(tokenization, tokenizeText);
 }
