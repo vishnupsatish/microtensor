@@ -1,7 +1,7 @@
 add_executable(xor xor.cc)
 target_link_libraries(xor Tensor Module util)
 
-add_library(GPT2Lib gpt2/gpt2.cc)
+add_library(GPT2Lib gpt2/gpt2.cc gpt2/tokenization.h gpt2/tokenization.cc)
 target_link_libraries(GPT2Lib Tensor Module)
 target_include_directories(GPT2Lib PUBLIC gpt2)
 

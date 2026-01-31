@@ -3,4 +3,16 @@
  *    Created: Jan 16, 2026
  **/
 
-int main() { return 0; }
+#include <iostream>
+#include <string>
+
+#include "tokenization.h"
+
+int main() {
+  // Testing tokenization.
+  std::string tok = "aaabdaaabac";
+
+  auto byteSeq = createByteSequenceFromString(tok);
+  TrainingText txt = {byteSeq};
+  train(txt, 260);
+}
