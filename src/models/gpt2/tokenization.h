@@ -6,7 +6,6 @@
 #pragma once
 
 #include <map>
-#include <unordered_map>
 #include <vector>
 
 // Want to work with unsigned, since tokens should ideally start from 0 and
@@ -18,7 +17,7 @@ using ByteSequence = std::vector<uint8_t>;
 using TrainingText = std::vector<ByteSequence>;
 
 // Maps token -> sequence of bytes.
-using Vocabulary = std::unordered_map<int, ByteSequence>;
+using Vocabulary = std::vector<ByteSequence>;
 
 // Maps list of bytes -> token.
 using TokenMap = std::map<ByteSequence, int>;

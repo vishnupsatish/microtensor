@@ -11,8 +11,10 @@
 int main() {
   // Testing tokenization.
   std::string tok = "aaabdaaabac";
+  std::string tok2 = "ababababa";
 
   auto byteSeq = createByteSequenceFromString(tok);
-  TrainingText txt = {byteSeq};
-  train(txt, 260);
+  auto bs2 = createByteSequenceFromString(tok2);
+  TrainingText txt = {byteSeq, bs2};
+  train(txt, 261);
 }

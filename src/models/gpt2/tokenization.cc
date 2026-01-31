@@ -10,7 +10,6 @@
 #include <limits>
 #include <list>
 #include <map>
-#include <queue>
 #include <set>
 #include <unordered_set>
 
@@ -18,17 +17,17 @@
 
 ByteSequence createByteSequenceFromString(const std::string& input) {
   ByteSequence ret;
-  for (char c : input) {
-    ret.push_back(static_cast<uint8_t>(c));
-  }
+  ret.reserve(input.size());
+  std::transform(input.begin(), input.end(), std::back_inserter(ret),
+                 [](char c) { return static_cast<uint8_t>(c); });
   return ret;
 }
 
 std::string createStringFromByteSequence(const ByteSequence& seq) {
   std::string s;
-  for (uint8_t byte : seq) {
-    s.push_back(static_cast<char>(byte));
-  }
+  s.reserve(seq.size());
+  std::transform(seq.begin(), seq.end(), std::back_inserter(s),
+                 [](uint8_t byte) { return static_cast<char>(byte); });
   return s;
 }
 
@@ -36,8 +35,7 @@ std::string createStringFromByteSequence(const ByteSequence& seq) {
 
 namespace {
 
-// Note: this is optimized for pure algorithmic efficiency, not practical
-// efficiency.
+// Note: this is optimized for algorithmic efficiency, not practical efficiency.
 class BPETokenizationBuilder {
   TrainingText m_text;
 
@@ -88,8 +86,10 @@ class BPETokenizationBuilder {
       m_tokenPairIndex;
 
   // Maps integer to the list of token pairs that occur that many times.
-  std::map<int, std::unordered_set<TokenPair, PairHash>, std::greater<>>
-      m_numTokenPair;
+  // We use a std::set here because in the case of ties in pair frequency, we
+  // will pick the pair with the smallest left token, then the smallest right
+  // token.
+  std::map<int, std::set<TokenPair>, std::greater<>> m_numTokenPair;
 
   ////////////////////////////////////////////////////
   // Debugging helpers
@@ -119,8 +119,8 @@ class BPETokenizationBuilder {
         std::cout << id->wordIndex << ' ' << id->index << '\n';
       }
     }
+    std::cout << '\n';
   }
-
   ////////////////////////////////////////////////////
 
   size_t tokenSize(int token) { return m_vocab[token].size(); }
@@ -184,7 +184,7 @@ class BPETokenizationBuilder {
     assert(std::numeric_limits<uint8_t>::max() == 255);
     for (int i = 0; i < 256; ++i) {
       uint8_t bytes = static_cast<uint8_t>(i);
-      m_vocab[i] = {bytes};
+      m_vocab.push_back({bytes});
       m_tokenMap[{bytes}] = i;
     }
   }
@@ -222,9 +222,6 @@ class BPETokenizationBuilder {
       // in that word.
       assert(std::next(firstToken) != m_words[firstToken->wordIndex].end());
       TokenID secondToken = std::next(firstToken);
-
-      // TODO: think about edge cases; single element linked list, maybe zero(?)
-      // element linked lists, etc.
 
       // Update `m_tokenPairIndex` and `m_numTokenPair`. Note: in the case of
       // overlapping pairs (such as aaa where we are merging a,a) we will be
@@ -272,8 +269,6 @@ class BPETokenizationBuilder {
     }
 
     int numOccurrences = m_tokenPairIndex[pair].size();
-    // Could be zero in the case of overlapping pairs potentially? I need to
-    // think about this.
     if (numOccurrences > 0) {
       m_numTokenPair[numOccurrences].erase(pair);
       if (m_numTokenPair[numOccurrences].empty()) {
@@ -303,22 +298,23 @@ class BPETokenizationBuilder {
     newTokenBytes.insert(newTokenBytes.end(), t1Bytes.begin(), t1Bytes.end());
     newTokenBytes.insert(newTokenBytes.end(), t2Bytes.begin(), t2Bytes.end());
     int newToken = m_vocab.size();
-    m_vocab[newToken] = newTokenBytes;
-    m_tokenMap[std::move(newTokenBytes)] = newToken;
+    m_tokenMap[newTokenBytes] = newToken;
+    m_vocab.push_back(std::move(newTokenBytes));
 
     mergeTokens(mergePair, newToken);
   }
 
  public:
   BPETokenizationBuilder(TrainingText text, int vocabSize)
-      : m_text{std::move(text)}, m_vocabSize{vocabSize} {}
-
-  Tokenization train() {
+      : m_text{std::move(text)}, m_vocabSize{vocabSize} {
     if (m_vocabSize < 256) {
       throw std::runtime_error{"Vocabulary size must be at least 256"};
     }
     initializeVocab();
     createInitialPairs();
+  }
+
+  Tokenization train() {
     printDebug();
     while (m_vocab.size() < m_vocabSize && m_numTokenPair.size() >= 1) {
       mergeMostCommonPair();
@@ -333,3 +329,5 @@ class BPETokenizationBuilder {
 Tokenization train(TrainingText text, int vocabSize) {
   return BPETokenizationBuilder{text, vocabSize}.train();
 }
+
+std::vector<int> tokenize(const Tokenization& bpe, ByteSequence input) {}
