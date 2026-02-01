@@ -43,4 +43,4 @@ The tensor library (and eventually, much of this deep learning engine) is differ
 - PyTorch documentation (for tensor operations and several abstractions)
 - https://jalammar.github.io/illustrated-gpt2/
 - https://en.wikipedia.org/wiki/Byte-pair_encoding
-- Gemini, for explaining several deep learning concepts to me
+- Gemini, for explaining several deep learning concepts to me and for writing a lot of the testing infrastructure and tests themselves
