@@ -8,6 +8,7 @@
 #include <functional>
 #include <utility>
 
+// Boost's `hash_combine` pattern.
 struct PairHash {
   size_t operator()(const std::pair<int, int>& p) const noexcept {
     size_t h1 = std::hash<int>{}(p.first);

@@ -66,6 +66,8 @@ Tensor Tensor::exp() { return Tensor{::exp(m_impl)}; }
 
 Tensor Tensor::log() { return Tensor{::log(m_impl)}; }
 
+Tensor Tensor::sqrt() { return Tensor{::sqrt(m_impl)}; }
+
 Tensor Tensor::matmul(const Tensor& other) {
   return Tensor{::matmul(m_impl, other.m_impl)};
 }
@@ -109,6 +111,12 @@ Tensor Tensor::relu() { return Tensor(::relu(m_impl)); }
 Tensor Tensor::gelu() { return Tensor(::geluApprox(m_impl)); }
 
 Tensor Tensor::softmax(int dim) { return Tensor(::softmax(m_impl, dim)); }
+
+Tensor Tensor::layerNorm(const Tensor& weight, const Tensor& bias,
+                         int numNormDims, float epsilon) {
+  return Tensor(
+      ::layerNorm(m_impl, weight.m_impl, bias.m_impl, numNormDims, epsilon));
+}
 
 Tensor Tensor::triu(int diagonal) { return Tensor(::triu(m_impl, diagonal)); }
 

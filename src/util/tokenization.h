@@ -40,8 +40,8 @@ Tokenization parseTokenization(std::istream& is);
 
 // Core BPE functions. For `train` and `tokenize`, the text must be
 // pre-tokenized, i.e., split up based on merge boundaries.
-Tokenization train(Text text, int vocabSize);
-std::vector<int> tokenize(const Tokenization& bpe, Text input);
+Tokenization trainBPE(Text text, int vocabSize);
+std::vector<int> tokenizeBPE(const Tokenization& bpe, Text input);
 
 ByteSequence convertTokenizationToBytes(const Tokenization& bpe,
                                         std::vector<int> tokenization);

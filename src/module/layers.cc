@@ -18,9 +18,13 @@ Linear::Linear(int inFeaturesInp, int outFeaturesInp, bool bias) {
   size_t outFeatures = outFeaturesInp;
   m_weight = Tensor{Shape{outFeatures, inFeatures}, true};
   float sk = std::sqrt(1.0f / inFeatures);
+  // I need to figure out a better custom initialization strategy.
   // auto fn = std::uniform_real_distribution<float>{-sk, sk};
   auto fn = std::normal_distribution<float>{0, 0.02};
-  auto init = std::bind_front(fn, RNG::get());
+  // Note: this used to be std::bind_front which created a copy of the
+  // random number generator. This led to the exact same sequence of values
+  // being emitted by the random generator.
+  auto init = [&]() { return fn(RNG::get()); };
   m_weight.fillRandom(init);
   insertParameter(m_weight);
 
@@ -54,7 +58,7 @@ Embedding::Embedding(int vocabSize, int embeddingSize) {
   // auto fn = std::normal_distribution<float>{0, 1};
   // TEMP.
   auto fn = std::normal_distribution<float>{0, 0.02};
-  auto init = std::bind_front(fn, RNG::get());
+  auto init = [&]() { return fn(RNG::get()); };
   m_embedding.fillRandom(init);
   insertParameter(m_embedding);
 }
@@ -92,12 +96,8 @@ LayerNorm::LayerNorm(Shape shape)
 }
 
 Tensor LayerNorm::forward(Tensor inp) {
-  auto ex = inp.reduceSum(m_reduceDims, true) / m_numReduceElements;
-  auto num = inp - ex;
-  auto ex2 = (inp * inp).reduceSum(m_reduceDims, true) / m_numReduceElements;
-  auto var = ex2 - (ex * ex);
-  auto denom = (var + m_epsilon).pow(0.5);
-  return (num / denom) * m_weight + m_bias;
+  int numNormDims = static_cast<int>(m_shape.size());
+  return inp.layerNorm(m_weight, m_bias, numNormDims, m_epsilon);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

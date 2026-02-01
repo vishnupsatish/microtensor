@@ -32,7 +32,7 @@ class AdamW : public Optimizer {
   float m_learningRate = 0.001;
   float m_beta1 = 0.9;
   float m_beta2 = 0.999;
-  float m_epsilon = 1e-8;
+  float m_epsilon = 1e-8f;
   float m_weightDecay = 0.01;
   float m_t = 1;
 

@@ -43,6 +43,7 @@ class Tensor {
   Tensor tanh();
   Tensor exp();
   Tensor log();
+  Tensor sqrt();
   Tensor matmul(const Tensor& other);
   Tensor permute(const std::vector<size_t>& dims);
   Tensor broadcast(const Shape& target);
@@ -56,6 +57,8 @@ class Tensor {
   Tensor relu();
   Tensor gelu();
   Tensor softmax(int dim);
+  Tensor layerNorm(const Tensor& weight, const Tensor& bias, int numNormDims,
+                   float epsilon = 1e-5f);
   Tensor triu(int diagonal = 0);
   Tensor maskedFill(const Tensor& mask, float val);
   Tensor gather(int dim, const Tensor& index);

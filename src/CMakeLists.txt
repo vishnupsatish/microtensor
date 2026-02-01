@@ -16,7 +16,7 @@ endif()
 message(STATUS "CMake build type: ${CMAKE_BUILD_TYPE}")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ffast-math -funroll-loops -flto")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -funroll-loops -flto")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto")
 endif()
 
@@ -28,5 +28,6 @@ add_subdirectory(module)
 add_subdirectory(util)
 add_subdirectory(models)
 
-# Copy text.txt to the root build directory (hack...)
+# Copy to the root build directory (hack...)
 configure_file(models/gpt2/text.txt ${CMAKE_BINARY_DIR}/text.txt COPYONLY)
+configure_file(models/gpt2/smallerWikipedia.txt ${CMAKE_BINARY_DIR}/smallerWikipedia.txt COPYONLY)

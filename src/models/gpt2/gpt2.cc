@@ -10,7 +10,7 @@
 #include "layers.h"
 #include "module.h"
 
-const int layers = 8;
+const int layers = 4;
 
 GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
     // Ugly... need to figure out a better way to take inputs as int to convert
@@ -20,7 +20,7 @@ GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
       m_pos{std::make_unique<Embedding>(maxSequenceLength, embeddingSize)},
       m_ln{std::make_unique<LayerNorm>(
           Shape{static_cast<size_t>(embeddingSize)})},
-      m_revEmb{std::make_unique<Linear>(embeddingSize, vocabSize)} {
+      m_revEmb{std::make_unique<Linear>(embeddingSize, vocabSize, false)} {
   m_transformers.reserve(layers);
   for (int i = 0; i < layers; ++i) {
     m_transformers.push_back(

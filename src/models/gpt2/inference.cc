@@ -18,7 +18,7 @@ int main() {
                    return createByteSequenceFromString(str);
                  });
 
-  auto tokenization = train(trainingText, 261);
+  auto tokenization = trainBPE(trainingText, 261);
 
   std::vector<std::string> tokenizeData = {"aaabdaaabac", "ababababa"};
   Text tokenizeText;
@@ -27,5 +27,5 @@ int main() {
                    return createByteSequenceFromString(str);
                  });
 
-  auto tokens = tokenize(tokenization, tokenizeText);
+  auto tokens = tokenizeBPE(tokenization, tokenizeText);
 }

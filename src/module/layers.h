@@ -30,7 +30,7 @@ class LayerNorm : public Module {
   size_t m_numReduceElements;
   Tensor m_weight, m_bias;
   std::vector<int> m_reduceDims;
-  float m_epsilon = 1e-05;
+  float m_epsilon = 1e-5f;
 
  public:
   LayerNorm(Shape shape);

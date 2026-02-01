@@ -283,5 +283,80 @@ int main() {
     a.argmax(1, true).dumpTensor(std::cout);
   }
 
+  // Test 37
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto weight = Tensor(Shape{3}, std::vector<float>{1, 1, 1});
+    auto bias = Tensor(Shape{3}, std::vector<float>{0, 0, 0});
+    a.layerNorm(weight, bias, 1).dumpTensor(std::cout);
+  }
+
+  // Test 38
+  {
+    auto a = Tensor(Shape{2, 2, 3},
+                    std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
+    auto weight = Tensor(Shape{2, 3}, std::vector<float>{1, 1, 1, 1, 1, 1});
+    auto bias = Tensor(Shape{2, 3}, std::vector<float>{0, 0, 0, 0, 0, 0});
+    a.layerNorm(weight, bias, 2).dumpTensor(std::cout);
+  }
+
+  // Test 39
+  {
+    auto a = Tensor(Shape{2, 4}, std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8});
+    auto weight = Tensor(Shape{4}, std::vector<float>{2, 2, 2, 2});
+    auto bias = Tensor(Shape{4}, std::vector<float>{1, 1, 1, 1});
+    a.layerNorm(weight, bias, 1).dumpTensor(std::cout);
+  }
+
+  // Test 40
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6}, true);
+    auto weight = Tensor(Shape{3}, std::vector<float>{1, 1, 1});
+    auto bias = Tensor(Shape{3}, std::vector<float>{0, 0, 0});
+    auto out = a.layerNorm(weight, bias, 1);
+    out.reduceSum({0, 1}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 41
+  {
+    auto a = Tensor(Shape{2, 3}, std::vector<float>{1, 2, 3, 4, 5, 6});
+    auto weight = Tensor(Shape{3}, std::vector<float>{1, 1, 1}, true);
+    auto bias = Tensor(Shape{3}, std::vector<float>{0, 0, 0}, true);
+    auto out = a.layerNorm(weight, bias, 1);
+    out.reduceSum({0, 1}, false).backward();
+    weight.getGrad().dumpTensor(std::cout);
+    bias.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 42
+  {
+    auto a =
+        Tensor(Shape{2, 4}, std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8}, true);
+    auto weight = Tensor(Shape{4}, std::vector<float>{2, 1, 0.5, 0.25}, true);
+    auto bias = Tensor(Shape{4}, std::vector<float>{0.1, 0.2, 0.3, 0.4}, true);
+    auto out = a.layerNorm(weight, bias, 1);
+    auto loss = (out * out).reduceSum({0, 1}, false);
+    loss.backward();
+    a.getGrad().dumpTensor(std::cout);
+    weight.getGrad().dumpTensor(std::cout);
+    bias.getGrad().dumpTensor(std::cout);
+  }
+
+  // Test 43
+  {
+    auto a =
+        Tensor(Shape{2, 2, 3},
+               std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, true);
+    auto weight =
+        Tensor(Shape{2, 3}, std::vector<float>{1, 1, 1, 1, 1, 1}, true);
+    auto bias = Tensor(Shape{2, 3}, std::vector<float>{0, 0, 0, 0, 0, 0}, true);
+    auto out = a.layerNorm(weight, bias, 2);
+    out.reduceSum({0, 1, 2}, false).backward();
+    a.getGrad().dumpTensor(std::cout);
+    weight.getGrad().dumpTensor(std::cout);
+    bias.getGrad().dumpTensor(std::cout);
+  }
+
   return 0;
 }

@@ -63,6 +63,8 @@ std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a);
 
 std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a);
 
+std::shared_ptr<TensorImpl> sqrt(std::shared_ptr<TensorImpl> a);
+
 std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
                                    std::shared_ptr<TensorImpl> b);
 
@@ -96,6 +98,11 @@ std::shared_ptr<TensorImpl> relu(std::shared_ptr<TensorImpl> a);
 std::shared_ptr<TensorImpl> geluApprox(std::shared_ptr<TensorImpl> a);
 
 std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim);
+
+std::shared_ptr<TensorImpl> layerNorm(std::shared_ptr<TensorImpl> input,
+                                      std::shared_ptr<TensorImpl> weight,
+                                      std::shared_ptr<TensorImpl> bias,
+                                      int numNormDims, float epsilon);
 
 std::shared_ptr<TensorImpl> gather(std::shared_ptr<TensorImpl> a, int dimInput,
                                    std::shared_ptr<TensorImpl> index);

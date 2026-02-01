@@ -214,6 +214,64 @@ def run():
     a36 = torch.tensor([[1, 6], [3, 4], [5, 2]], dtype=torch.float32)
     results.append(torch.argmax(a36, dim=1, keepdim=True).to(torch.float32).numpy())
 
+    # Test 37
+    a37 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+    weight37 = torch.tensor([1, 1, 1], dtype=torch.float32)
+    bias37 = torch.tensor([0, 0, 0], dtype=torch.float32)
+    results.append(F.layer_norm(a37, (3,), weight37, bias37).numpy())
+
+    # Test 38
+    a38 = torch.tensor([[[1, 2, 3], [4, 5, 6]],
+                        [[7, 8, 9], [10, 11, 12]]], dtype=torch.float32)
+    weight38 = torch.tensor([[1, 1, 1], [1, 1, 1]], dtype=torch.float32)
+    bias38 = torch.tensor([[0, 0, 0], [0, 0, 0]], dtype=torch.float32)
+    results.append(F.layer_norm(a38, (2, 3), weight38, bias38).numpy())
+
+    # Test 39
+    a39 = torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.float32)
+    weight39 = torch.tensor([2, 2, 2, 2], dtype=torch.float32)
+    bias39 = torch.tensor([1, 1, 1, 1], dtype=torch.float32)
+    results.append(F.layer_norm(a39, (4,), weight39, bias39).numpy())
+
+    # Test 40
+    a40 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32, requires_grad=True)
+    weight40 = torch.tensor([1, 1, 1], dtype=torch.float32)
+    bias40 = torch.tensor([0, 0, 0], dtype=torch.float32)
+    out40 = F.layer_norm(a40, (3,), weight40, bias40)
+    out40.sum().backward()
+    results.append(a40.grad.numpy())
+
+    # Test 41
+    a41 = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+    weight41 = torch.tensor([1, 1, 1], dtype=torch.float32, requires_grad=True)
+    bias41 = torch.tensor([0, 0, 0], dtype=torch.float32, requires_grad=True)
+    out41 = F.layer_norm(a41, (3,), weight41, bias41)
+    out41.sum().backward()
+    results.append(weight41.grad.numpy())
+    results.append(bias41.grad.numpy())
+
+    # Test 42
+    a42 = torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.float32, requires_grad=True)
+    weight42 = torch.tensor([2, 1, 0.5, 0.25], dtype=torch.float32, requires_grad=True)
+    bias42 = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float32, requires_grad=True)
+    out42 = F.layer_norm(a42, (4,), weight42, bias42)
+    loss42 = (out42 * out42).sum()
+    loss42.backward()
+    results.append(a42.grad.numpy())
+    results.append(weight42.grad.numpy())
+    results.append(bias42.grad.numpy())
+
+    # Test 43
+    a43 = torch.tensor([[[1, 2, 3], [4, 5, 6]],
+                        [[7, 8, 9], [10, 11, 12]]], dtype=torch.float32, requires_grad=True)
+    weight43 = torch.tensor([[1, 1, 1], [1, 1, 1]], dtype=torch.float32, requires_grad=True)
+    bias43 = torch.tensor([[0, 0, 0], [0, 0, 0]], dtype=torch.float32, requires_grad=True)
+    out43 = F.layer_norm(a43, (2, 3), weight43, bias43)
+    out43.sum().backward()
+    results.append(a43.grad.numpy())
+    results.append(weight43.grad.numpy())
+    results.append(bias43.grad.numpy())
+
     return results
 
 if __name__ == "__main__":

@@ -162,6 +162,18 @@ class LogOp : public Operation {
   }
 };
 
+class SqrtOp : public Operation {
+ public:
+  using Operation::Operation;
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    auto out = m_output.lock();
+    return {divide(grad_output, multiply(out, 2.0f))};
+  }
+};
+
 class BroadcastOp : public Operation {
  public:
   using Operation::Operation;
@@ -461,6 +473,74 @@ class GeluOp : public Operation {
   }
 };
 
+class LayerNormOp : public Operation {
+  std::shared_ptr<TensorImpl> m_xHat;
+  std::shared_ptr<TensorImpl> m_rStd;
+  int m_numNormDims;
+  size_t m_numNormElements;
+
+ public:
+  LayerNormOp(std::vector<std::shared_ptr<TensorImpl>> parents,
+              std::shared_ptr<TensorImpl> output,
+              std::shared_ptr<TensorImpl> xHat,
+              std::shared_ptr<TensorImpl> rstd, int numNormDims,
+              size_t numNormElements)
+      : Operation(std::move(parents), output),
+        m_xHat(std::move(xHat)),
+        m_rStd(std::move(rstd)),
+        m_numNormDims(numNormDims),
+        m_numNormElements(numNormElements) {}
+
+  std::vector<std::shared_ptr<TensorImpl>> backward(
+      std::shared_ptr<TensorImpl> grad_output) override {
+    NoGrad guard;
+    auto input = m_parents[0];
+    auto weight = m_parents[1];
+    auto bias = m_parents[2];
+
+    // Get the dimensions to reduce over (last numNormDims dimensions)
+    std::vector<int> reduceDims;
+    int rank = static_cast<int>(input->getRank());
+    for (int i = rank - m_numNormDims; i < rank; ++i) {
+      reduceDims.push_back(i);
+    }
+
+    // dL/dweight = sum(dL/dy * x_hat) over batch dimensions
+    // dL/dbias = sum(dL/dy) over batch dimensions
+    auto grad_times_xhat = multiply(grad_output, m_xHat);
+
+    // Reduce over batch dimensions
+    std::vector<int> batchDims;
+    for (int i = 0; i < rank - m_numNormDims; ++i) {
+      batchDims.push_back(i);
+    }
+
+    std::shared_ptr<TensorImpl> grad_weight;
+    std::shared_ptr<TensorImpl> grad_bias;
+    if (!batchDims.empty()) {
+      grad_weight = reduceSum(grad_times_xhat, batchDims, false);
+      grad_bias = reduceSum(grad_output, batchDims, false);
+    } else {
+      grad_weight = grad_times_xhat;
+      grad_bias = grad_output;
+    }
+
+    // dL/dx = rstd * (dL/dy * gamma - mean(dL/dy * gamma)
+    //                - x_hat * mean(dL/dy * gamma * x_hat))
+    auto term1 = multiply(grad_output, weight);
+    auto term2 =
+        divide(reduceSum(term1, reduceDims, true), (float)m_numNormElements);
+    auto dLdy_gamma_xhat = multiply(term1, m_xHat);
+    auto mean_dLdy_gamma_xhat = divide(
+        reduceSum(dLdy_gamma_xhat, reduceDims, true), (float)m_numNormElements);
+    auto term3 = multiply(m_xHat, mean_dLdy_gamma_xhat);
+    auto inner = subtract(subtract(term1, term2), term3);
+    auto grad_input = multiply(inner, m_rStd);
+
+    return {grad_input, grad_weight, grad_bias};
+  }
+};
+
 class GatherOp : public Operation {
   int m_dim;
 
@@ -658,6 +738,16 @@ std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a) {
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<LogOp>(std::vector{a}, out);
+  }
+  return out;
+}
+
+std::shared_ptr<TensorImpl> sqrt(std::shared_ptr<TensorImpl> a) {
+  auto out = std::make_shared<TensorImpl>(a->m_shape);
+  elementwiseUnaryKernel(out, a, std::sqrt<float>);
+  out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
+  if (out->m_requiresGrad) {
+    out->m_creator = std::make_unique<SqrtOp>(std::vector{a}, out);
   }
   return out;
 }
@@ -960,8 +1050,7 @@ std::shared_ptr<TensorImpl> reshape(std::shared_ptr<TensorImpl> a,
                                     Shape newShape) {
   // TODO: verify newShape.
   // Note: we use a weaker condition in terms of when a reshape view is
-  // possible. Need to understand the stronger condition and potentially use it
-  // in the future, so we don't unnecessarily make contiguous.
+  // possible.
   auto a_cont = makeContiguous(a);
   auto out = std::make_shared<TensorImpl>(
       newShape, defaultStridesFromShape(newShape), a_cont->m_data);
@@ -1031,6 +1120,67 @@ std::shared_ptr<TensorImpl> softmax(std::shared_ptr<TensorImpl> a, int dim) {
   auto expA = exp(shifted);
   auto sumExp = reduceSum(expA, {dim}, true);
   return divide(expA, sumExp);
+}
+
+std::shared_ptr<TensorImpl> layerNorm(std::shared_ptr<TensorImpl> input,
+                                      std::shared_ptr<TensorImpl> weight,
+                                      std::shared_ptr<TensorImpl> bias,
+                                      int numNormDims, float epsilon) {
+  if (numNormDims <= 0 || numNormDims > static_cast<int>(input->getRank())) {
+    throw std::runtime_error("Invalid numNormDims for layerNorm");
+  }
+
+  // Get the dimensions to reduce over (last `numNormDims` dimensions)
+  std::vector<int> reduceDims;
+  int rank = static_cast<int>(input->getRank());
+  for (int i = rank - numNormDims; i < rank; ++i) {
+    reduceDims.push_back(i);
+  }
+
+  size_t numNormElements = 1;
+  for (int i = rank - numNormDims; i < rank; ++i) {
+    numNormElements *= input->m_shape[i];
+  }
+
+  std::shared_ptr<TensorImpl> out, xHat, rStd;
+  {
+    // Forward pass: disable gradient tracking so these intermediate operations
+    // (like `reduceSum`, etc.) don't create autograd nodes. We'll attach the
+    // fused backward operation manually. Although it is technically correct to
+    // not have this guard (since we would overwrite the output's m_creator
+    // anyways), it is a waste.
+    NoGrad guard;
+
+    // Compute mean: mean = sum(x) / n
+    auto sum = reduceSum(input, reduceDims, true);
+    auto mean = divide(sum, static_cast<float>(numNormElements));
+
+    auto centered = subtract(input, mean);
+
+    // Compute variance: var = sum((x - mean)^2) / n
+    auto centered_sq = multiply(centered, centered);
+    auto var = divide(reduceSum(centered_sq, reduceDims, true),
+                      static_cast<float>(numNormElements));
+
+    auto var_eps = add(var, epsilon);
+    rStd = divide(1.0f, sqrt(var_eps));
+
+    xHat = multiply(centered, rStd);
+
+    // Apply transformation based on weight, bias
+    auto scaled = multiply(xHat, weight);
+    out = add(scaled, bias);
+  }
+
+  out->m_requiresGrad =
+      GradMode::enabled &&
+      (input->m_requiresGrad || weight->m_requiresGrad || bias->m_requiresGrad);
+  if (out->m_requiresGrad) {
+    out->m_creator =
+        std::make_unique<LayerNormOp>(std::vector{input, weight, bias}, out,
+                                      xHat, rStd, numNormDims, numNormElements);
+  }
+  return out;
 }
 
 std::shared_ptr<TensorImpl> gather(std::shared_ptr<TensorImpl> a, int dimInput,

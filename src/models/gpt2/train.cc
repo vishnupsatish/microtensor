@@ -5,10 +5,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <csignal>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <numeric>
 #include <random>
 
@@ -16,6 +18,8 @@
 #include "grad_mode.h"
 #include "loss_function.h"
 #include "optimizer.h"
+#include "tokenization.h"
+#include "utils.h"
 
 std::atomic<bool> stopTraining(false);
 
@@ -31,61 +35,36 @@ void signalHandler(int signum) {
   }
 }
 
-std::vector<uint8_t> readFile(const std::string& path) {
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    throw std::runtime_error("Failed to open file");
-  }
-
-  file.seekg(0, std::ios::end);
-  std::streamsize size = file.tellg();
-  file.seekg(0, std::ios::beg);
-
-  std::vector<uint8_t> buffer(size);
-  file.read(reinterpret_cast<char*>(buffer.data()), size);
-
-  if (!file) {
-    throw std::runtime_error("Failed to read entire file");
-  }
-
-  return buffer;
-}
-
-// Returns a pair: {InputTensor, TargetTensor}
-std::pair<Tensor, Tensor> getBatch(const std::vector<uint8_t>& rawData,
-                                   int batchSize, int seqLen) {
-  std::vector<float> inputBatch;
-  std::vector<float> targetBatch;
-  inputBatch.reserve(batchSize * seqLen);
-  targetBatch.reserve(batchSize * seqLen);
-
-  for (int b = 0; b < batchSize; ++b) {
-    int maxIdx = rawData.size() - seqLen - 1;
-    int randomIdx = rand() % maxIdx;
-    for (int t = 0; t < seqLen; ++t) {
-      inputBatch.push_back(static_cast<float>(rawData[randomIdx + t]));
-      targetBatch.push_back(static_cast<float>(rawData[randomIdx + t + 1]));
-    }
-  }
-
-  Tensor inputs{Shape{(size_t)batchSize, (size_t)seqLen}, inputBatch};
-  Tensor targets{Shape{(size_t)batchSize, (size_t)seqLen}, targetBatch};
-
-  return {inputs, targets};
-}
-
 const int maxSequenceLength = 128;
-const int embeddingSize = 384;
+const int embeddingSize = 256;
+const int vocabSize = 4096;
+
+const int batchesForOptimizerUpdate = 48;
+const int parallelBatches = 24;
 
 int main() {
   std::signal(SIGINT, signalHandler);
-  auto trainData = readFile("text.txt");
 
-  GPT2 model{256, maxSequenceLength, embeddingSize};
-  auto opt = AdamW{model.getParameters(), 3e-4, 0.9, 0.999, 1e-8, 0.01};
+  std::cout << "Pre-tokenizing...\n";
+  // Thanks to
+  // https://www.kaggle.com/datasets/ffatty/plain-text-wikipedia-simpleenglish
+  // for the Wikipedia dataset (MIT License).
+  std::string trainData = readFileToString("smallerWikipedia.txt");
+  std::vector<std::string> preTokenized = preTokenizeSimple(trainData);
+  Text byteSeq;
+  std::transform(
+      preTokenized.begin(), preTokenized.end(), std::back_inserter(byteSeq),
+      [](const std::string& st) { return createByteSequenceFromString(st); });
+  Tokenization bpe = trainBPE(byteSeq, vocabSize);
+  std::cout << "Training tokenizer...\n";
+  std::vector<int> tokenizedTrain = tokenizeBPE(bpe, byteSeq);
+
+  GPT2 model{vocabSize, maxSequenceLength, embeddingSize};
+  auto opt = AdamW{model.getParameters(), 3e-4f, 0.9, 0.999, 1e-8f, 0.01};
   std::cout << "Training...\n";
-  int accumulationSteps = 4;
-  for (int epoch = 1; epoch <= 2000; ++epoch) {
+  assert(batchesForOptimizerUpdate % parallelBatches == 0);
+  int accumulationSteps = batchesForOptimizerUpdate / parallelBatches;
+  for (int epoch = 1; epoch <= 10000; ++epoch) {
     if (stopTraining) break;
     std::cout << "Starting Global Step " << epoch << " (accumulating "
               << accumulationSteps << " batches)\n";
@@ -95,7 +74,8 @@ int main() {
     float totalLoss = 0;
 
     for (int i = 0; i < accumulationSteps; ++i) {
-      auto [inp, target] = getBatch(trainData, 12, maxSequenceLength);
+      auto [inp, target] =
+          getBatch(tokenizedTrain, parallelBatches, maxSequenceLength);
       auto gptRes = model.forward(inp);
       auto loss = crossEntropy(gptRes, target);
       totalLoss += loss.item();
@@ -110,6 +90,7 @@ int main() {
     std::cout << "  Average Step Loss: " << (totalLoss / accumulationSteps)
               << '\n';
     std::cout << "  Optimizing parameters...\n";
+
     opt.step();
 
     auto t_end = std::chrono::high_resolution_clock::now();
@@ -122,10 +103,18 @@ int main() {
   std::cout << "Inference...\n";
   {
     NoGrad guard;
-    std::string prompt = "What is the world definition please tell me ";
+    std::string prompt = "My name is Ishmael and ";
+    std::vector<std::string> preTokenizedPrompt = preTokenizeSimple(prompt);
+    Text byteSeqPrompt;
+    std::transform(
+        preTokenizedPrompt.begin(), preTokenizedPrompt.end(),
+        std::back_inserter(byteSeqPrompt),
+        [](const std::string& st) { return createByteSequenceFromString(st); });
+    std::vector<int> tokenizedPrompt = tokenizeBPE(bpe, byteSeqPrompt);
+
     std::vector<float> context;
-    for (uint8_t c : prompt) {
-      context.push_back(static_cast<float>(c));
+    for (int t : tokenizedPrompt) {
+      context.push_back(static_cast<float>(t));
     }
 
     int tokensToGenerate = 100;
@@ -136,21 +125,20 @@ int main() {
       }
       Tensor input{Shape{1, context.size()}, context};
 
-      // Output: (1, Seq, 256)
+      // Output: (1, Seq, vocabSize)
       Tensor logits = model.forward(input);
 
       // We only care about the prediction for the very last position
       int seqLen = context.size();
-      Tensor lastLogits =
-          logits.slice({0, seqLen - 1, 0}, {1, 1, embeddingSize});
+      Tensor lastLogits = logits.slice({0, seqLen - 1, 0}, {1, 1, vocabSize});
 
-      // Get index of the highest score using top-k sampling (k=10).
+      // Get index of the highest score using top-k sampling.
       std::vector<float> logitsVec = lastLogits.data();
       std::vector<int> indices(logitsVec.size());
       std::iota(indices.begin(), indices.end(), 0);
 
       // Sort indices based on logits
-      int k = 10;
+      int k = 5;
       std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
                         [&logitsVec](int i1, int i2) {
                           return logitsVec[i1] > logitsVec[i2];
@@ -178,8 +166,10 @@ int main() {
       std::discrete_distribution<> d(topKLogits.begin(), topKLogits.end());
       int nextTokenId = indices[d(gen)];
 
-      char nextChar = static_cast<char>(nextTokenId);
-      std::cout << nextChar << std::flush;
+      ByteSequence byteSeq = bpe.vocab[nextTokenId];
+      std::string outputStr = createStringFromByteSequence(byteSeq);
+      std::cout << outputStr << std::flush;
+
       context.push_back(static_cast<float>(nextTokenId));
     }
   }

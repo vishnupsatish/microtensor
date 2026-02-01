@@ -314,6 +314,7 @@ class BPETokenizationBuilder {
   }
 
  public:
+  // Constructor for training
   BPETokenizationBuilder(Text text, int vocabSize)
       : m_action{BPEAction::Train},
         m_text{std::move(text)},
@@ -325,6 +326,7 @@ class BPETokenizationBuilder {
     createInitialPairs();
   }
 
+  // Constructor for tokenization.
   BPETokenizationBuilder(Text text, const Tokenization& bpe)
       : m_action{BPEAction::Tokenize},
         m_text{std::move(text)},
@@ -335,20 +337,15 @@ class BPETokenizationBuilder {
   }
 
   Tokenization train() {
-    std::cout << "Starting training\n";
     assert(m_action == BPEAction::Train);
-    printDebug();
     while (m_vocab.size() < m_vocabSize && m_numTokenPair.size() >= 1) {
       mergeMostCommonPairUpdateVocab();
-      printDebug();
     }
     return {m_vocab, m_tokenMap, m_merges};
   }
 
   std::vector<int> tokenize() {
-    std::cout << "Starting tokenization\n";
     assert(m_action == BPEAction::Tokenize);
-    printDebug();
     for (const auto& [t1, t2] : m_merges) {
       // Get the token number associated with the merged t1, t2.
       const ByteSequence& t1Bytes = m_vocab[t1];
@@ -360,7 +357,6 @@ class BPETokenizationBuilder {
 
       mergeTokens({t1, t2}, m_tokenMap[newTokenBytes]);
     }
-    printDebug();
     std::vector<int> tokens;
     for (const auto& w : m_words) {
       for (const auto& tokenLoc : w) {
@@ -373,11 +369,11 @@ class BPETokenizationBuilder {
 
 }  // namespace
 
-Tokenization train(Text text, int vocabSize) {
+Tokenization trainBPE(Text text, int vocabSize) {
   return BPETokenizationBuilder{text, vocabSize}.train();
 }
 
-std::vector<int> tokenize(const Tokenization& bpe, Text input) {
+std::vector<int> tokenizeBPE(const Tokenization& bpe, Text input) {
   return BPETokenizationBuilder{input, bpe}.tokenize();
 }
 
