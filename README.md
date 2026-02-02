@@ -16,7 +16,7 @@ Supports training and inference. No external dependencies.
 - Multi-headed self-attention, transformer, and GPT2 implementation
   - [src/module/transformer.cc](src/module/transformer.cc)
   - [src/models/gpt2/train.cc](src/models/gpt2/train.cc)
-- Byte-pair encoding implementation optimized for algorithmic effiency
+- Byte-pair encoding implementation optimized for pure algorithmic efficiency (as opposed to practical efficiency)
   - [src/util/tokenization.cc](src/util/tokenization.cc)
   - Did not consult any references (other than the definition of BPE) when developing this
 
@@ -44,3 +44,4 @@ The tensor library (and eventually, much of this deep learning engine) is differ
 - https://jalammar.github.io/illustrated-gpt2/
 - https://en.wikipedia.org/wiki/Byte-pair_encoding
 - Gemini, for explaining several deep learning concepts to me and for writing a lot of the testing infrastructure and tests themselves
+- https://karpathy.ai/zero-to-hero.html: Karpathy's deep learning series
