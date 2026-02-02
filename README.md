@@ -32,7 +32,7 @@ Supports training and inference. No external dependencies.
 
 ### Build
 
-Probably requires C++ 20.
+Probably requires C++ 20 (need to write more).
 
 ### Testing
 

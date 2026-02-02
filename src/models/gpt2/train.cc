@@ -18,6 +18,7 @@
 #include "grad_mode.h"
 #include "loss_function.h"
 #include "optimizer.h"
+#include "random_gen.h"
 #include "tokenization.h"
 #include "utils.h"
 
@@ -162,9 +163,8 @@ int main() {
       }
 
       // Sample from top-k
-      static std::mt19937 gen(42);
       std::discrete_distribution<> d(topKLogits.begin(), topKLogits.end());
-      int nextTokenId = indices[d(gen)];
+      int nextTokenId = indices[d(RNG::get())];
 
       ByteSequence byteSeq = bpe.vocab[nextTokenId];
       std::string outputStr = createStringFromByteSequence(byteSeq);
