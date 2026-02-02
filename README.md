@@ -38,6 +38,15 @@ Probably requires C++ 20 (need to write more).
 
 The tensor library (and eventually, much of this deep learning engine) is differentially tested against PyTorch. Look at `src/tensor/unittest` for examples.
 
+### Notes
+
+Important optimizations (with approximate speedups per GPT2 training step, in order):
+
+- Parallelizing batch dimensions of matmul (7x speedup)
+- Making `a` contiguous and `b` transpose-contiguous (in memory) when performing `ab` in `matmulBatched` (2x speedup)
+- Parallelizing the `makeContinguous` operation (~18% speedup)
+- Moved making contiguous to `matmul` operation, rather than in `matmulBatched` kernel (so it is done before broadcasting, so we avoid allocating memory when we have something like a strided view) (~5-8% speedup)
+
 ### References
 
 - PyTorch documentation (for tensor operations and several abstractions)

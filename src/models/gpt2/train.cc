@@ -104,7 +104,7 @@ int main() {
   std::cout << "Inference...\n";
   {
     NoGrad guard;
-    std::string prompt = "My name is Ishmael and ";
+    std::string prompt = "Cricket is a sport ";
     std::vector<std::string> preTokenizedPrompt = preTokenizeSimple(prompt);
     Text byteSeqPrompt;
     std::transform(

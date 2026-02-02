@@ -828,15 +828,36 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   auto a_2d = a->getRank() == 1 ? unsqueeze(a, {-2}) : a;
   auto b_2d = b->getRank() == 1 ? unsqueeze(b, {-1}) : b;
 
+  int bRank = b_2d->getRank();
+
+  std::vector<size_t> transpose;
+  for (int i = 0; i < bRank - 2; ++i) {
+    transpose.push_back(i);
+  }
+  transpose.push_back(bRank - 1);
+  transpose.push_back(bRank - 2);
+
+  // Make `a` contiguous and `b` transpose-contiguous. Helps with cache
+  // locality when looping `p` in the contiguous matmul kernel, since we loop
+  // a single row of `a` and single column of `b` to get the output value.
+  //
+  // Note: this is done here to make contiguous before broadcasting, so we do
+  // not unnecessarily allocate more memory than is needed. To be able to work
+  // with the current batched matmul kernel, all we require is that the last two
+  // dimensions of a are contiguous in memory and the last two dimensions of the
+  // transpose of b are contiguous in memory.
+  auto newA = makeContiguous(a_2d);
+  auto newB = permute(makeContiguous(permute(b_2d, transpose)), transpose);
+
   // Broadcast the first rank-2 dimensions
-  auto shapesOpt = getBroadcastShapesForMatmul(a_2d->m_shape, b_2d->m_shape);
+  auto shapesOpt = getBroadcastShapesForMatmul(newA->m_shape, newB->m_shape);
   if (!shapesOpt) {
     throw std::runtime_error("Incompatible shapes for matrix multiplication");
   }
   auto [shape_a_2d, shape_b_2d] = *shapesOpt;
-  // Note: shares the same data as `a` and `b`.
-  auto a_bc = shape_a_2d != a_2d->m_shape ? broadcast(a_2d, shape_a_2d) : a_2d;
-  auto b_bc = shape_b_2d != b_2d->m_shape ? broadcast(b_2d, shape_b_2d) : b_2d;
+
+  auto a_bc = shape_a_2d != newA->m_shape ? broadcast(newA, shape_a_2d) : newA;
+  auto b_bc = shape_b_2d != newB->m_shape ? broadcast(newB, shape_b_2d) : newB;
 
   // It holds that a_bc and b_bc are both at least two dimensions, and the
   // shapes are matmul-compatible.
@@ -845,7 +866,7 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   outShape.push_back(b_bc->m_shape[b_bc->m_shape.size() - 1]);
   auto matmulRes = std::make_shared<TensorImpl>(outShape);
 
-  matmulBatched(matmulRes, a_bc, b_bc);
+  matmulContiguousBatched(matmulRes, a_bc, b_bc);
 
   matmulRes->m_requiresGrad =
       GradMode::enabled && (a_bc->m_requiresGrad || b_bc->m_requiresGrad);
@@ -1030,12 +1051,20 @@ std::shared_ptr<TensorImpl> makeContiguous(std::shared_ptr<TensorImpl> a) {
     return a;
   }
   size_t total_elements = sizeFromShape(a->m_shape);
-  std::vector<size_t> coords(a->m_shape.size(), 0);
   std::vector<float> newData(total_elements);
-  for (size_t i = 0; i < total_elements; ++i) {
-    size_t offset_a = getPhysicalOffset(coords, a->m_strides, a->m_offset);
-    newData[i] = (*a->m_data)[offset_a];
-    incrementCoords(coords, a->m_shape);
+  // Parallelized since this is called twice for every matmul. This leads to a
+  // noticeable speedup in GPT2 training, leading to an ~18% decrease per
+  // optimizer update.
+#pragma omp parallel
+  {
+    std::vector<size_t> current_coords(a->m_shape.size(), 0);
+#pragma omp for
+    for (size_t i = 0; i < total_elements; ++i) {
+      getCoordsFromIndex(i, a->m_shape, current_coords);
+      size_t offset_a =
+          getPhysicalOffset(current_coords, a->m_strides, a->m_offset);
+      newData[i] = (*a->m_data)[offset_a];
+    }
   }
   // contiguous, so ctor will calculate default strides.
   auto out = std::make_shared<TensorImpl>(a->m_shape, newData);
