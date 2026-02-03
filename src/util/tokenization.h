@@ -5,7 +5,9 @@
 
 #pragma once
 
+#include <cstdint>
 #include <map>
+#include <string>
 #include <vector>
 
 // Want to work with unsigned, since tokens should ideally start from 0 and

@@ -5,6 +5,8 @@
 
 #include "optimizer.h"
 
+#include <cmath>
+
 #include "grad_mode.h"
 
 Optimizer::Optimizer(std::vector<Tensor> parameters)

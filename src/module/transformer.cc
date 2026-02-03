@@ -6,6 +6,7 @@
 #include "transformer.h"
 
 #include <cassert>
+#include <cmath>
 #include <limits>
 #include <memory>
 

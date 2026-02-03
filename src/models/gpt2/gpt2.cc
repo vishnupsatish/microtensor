@@ -10,7 +10,7 @@
 #include "layers.h"
 #include "module.h"
 
-const int layers = 4;
+const int layers = 6;
 
 GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
     // Ugly... need to figure out a better way to take inputs as int to convert

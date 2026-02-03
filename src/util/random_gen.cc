@@ -5,6 +5,8 @@
 
 #include "random_gen.h"
 
+#include <stdexcept>
+
 std::mt19937 RNG::instance;
 bool RNG::seedSet = false;
 

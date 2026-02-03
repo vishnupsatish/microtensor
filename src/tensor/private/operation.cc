@@ -5,8 +5,10 @@
 
 #include "operation.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -714,7 +716,7 @@ std::shared_ptr<TensorImpl> subtract(std::shared_ptr<TensorImpl> a,
 
 std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a) {
   auto out = std::make_shared<TensorImpl>(a->m_shape);
-  elementwiseUnaryKernel(out, a, std::tanh<float>);
+  elementwiseUnaryKernel(out, a, [](float x) { return std::tanh(x); });
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<TanhOp>(std::vector{a}, out);
@@ -724,7 +726,7 @@ std::shared_ptr<TensorImpl> tanh(std::shared_ptr<TensorImpl> a) {
 
 std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a) {
   auto out = std::make_shared<TensorImpl>(a->m_shape);
-  elementwiseUnaryKernel(out, a, std::exp<float>);
+  elementwiseUnaryKernel(out, a, [](float x) { return std::exp(x); });
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<ExpOp>(std::vector{a}, out);
@@ -734,7 +736,7 @@ std::shared_ptr<TensorImpl> exp(std::shared_ptr<TensorImpl> a) {
 
 std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a) {
   auto out = std::make_shared<TensorImpl>(a->m_shape);
-  elementwiseUnaryKernel(out, a, std::log<float>);
+  elementwiseUnaryKernel(out, a, [](float x) { return std::log(x); });
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<LogOp>(std::vector{a}, out);
@@ -744,7 +746,7 @@ std::shared_ptr<TensorImpl> log(std::shared_ptr<TensorImpl> a) {
 
 std::shared_ptr<TensorImpl> sqrt(std::shared_ptr<TensorImpl> a) {
   auto out = std::make_shared<TensorImpl>(a->m_shape);
-  elementwiseUnaryKernel(out, a, std::sqrt<float>);
+  elementwiseUnaryKernel(out, a, [](float x) { return std::sqrt(x); });
   out->m_requiresGrad = GradMode::enabled && (a->m_requiresGrad);
   if (out->m_requiresGrad) {
     out->m_creator = std::make_unique<SqrtOp>(std::vector{a}, out);
@@ -780,7 +782,7 @@ std::shared_ptr<TensorImpl> squeeze(std::shared_ptr<TensorImpl> a,
     }
     normalizedDims.push_back(dim);
   }
-  sort(normalizedDims.rbegin(), normalizedDims.rend());
+  std::sort(normalizedDims.rbegin(), normalizedDims.rend());
   for (auto dim : normalizedDims) {
     shape.erase(shape.begin() + dim);
     strides.erase(strides.begin() + dim);
@@ -803,7 +805,7 @@ std::shared_ptr<TensorImpl> unsqueeze(std::shared_ptr<TensorImpl> a,
     int dim = dimInput >= 0 ? dimInput : a->getRank() + dimInput + 1;
     normalizedDims.push_back(dim);
   }
-  sort(normalizedDims.begin(), normalizedDims.end());
+  std::sort(normalizedDims.begin(), normalizedDims.end());
   for (auto dim : normalizedDims) {
     shape.insert(shape.begin() + dim, 1);
     strides.insert(strides.begin() + dim, 0);
@@ -830,12 +832,12 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
 
   int bRank = b_2d->getRank();
 
-  std::vector<size_t> transpose;
-  for (int i = 0; i < bRank - 2; ++i) {
-    transpose.push_back(i);
-  }
-  transpose.push_back(bRank - 1);
-  transpose.push_back(bRank - 2);
+  // std::vector<size_t> transpose;
+  // for (int i = 0; i < bRank - 2; ++i) {
+  //   transpose.push_back(i);
+  // }
+  // transpose.push_back(bRank - 1);
+  // transpose.push_back(bRank - 2);
 
   // Make `a` contiguous and `b` transpose-contiguous. Helps with cache
   // locality when looping `p` in the contiguous matmul kernel, since we loop
@@ -847,7 +849,8 @@ std::shared_ptr<TensorImpl> matmul(std::shared_ptr<TensorImpl> a,
   // dimensions of a are contiguous in memory and the last two dimensions of the
   // transpose of b are contiguous in memory.
   auto newA = makeContiguous(a_2d);
-  auto newB = permute(makeContiguous(permute(b_2d, transpose)), transpose);
+  // auto newB = permute(makeContiguous(permute(b_2d, transpose)), transpose);
+  auto newB = makeContiguous(b_2d);
 
   // Broadcast the first rank-2 dimensions
   auto shapesOpt = getBroadcastShapesForMatmul(newA->m_shape, newB->m_shape);

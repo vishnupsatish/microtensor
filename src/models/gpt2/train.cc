@@ -37,20 +37,17 @@ void signalHandler(int signum) {
 }
 
 const int maxSequenceLength = 128;
-const int embeddingSize = 256;
+const int embeddingSize = 384;
 const int vocabSize = 4096;
 
-const int batchesForOptimizerUpdate = 48;
-const int parallelBatches = 24;
+const int batchesForOptimizerUpdate = 32;
+const int parallelBatches = 16;
 
 int main() {
   std::signal(SIGINT, signalHandler);
 
   std::cout << "Pre-tokenizing...\n";
-  // Thanks to
-  // https://www.kaggle.com/datasets/ffatty/plain-text-wikipedia-simpleenglish
-  // for the Wikipedia dataset (MIT License).
-  std::string trainData = readFileToString("smallerWikipedia.txt");
+  std::string trainData = readFileToString("pridePrejudice.txt");
   std::vector<std::string> preTokenized = preTokenizeSimple(trainData);
   Text byteSeq;
   std::transform(
@@ -118,7 +115,7 @@ int main() {
       context.push_back(static_cast<float>(t));
     }
 
-    int tokensToGenerate = 100;
+    int tokensToGenerate = 300;
     for (int i = 0; i < tokensToGenerate; ++i) {
       if (context.size() > maxSequenceLength) {
         size_t overflow = context.size() - maxSequenceLength;

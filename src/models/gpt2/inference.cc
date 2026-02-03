@@ -3,6 +3,7 @@
  *    Created: Jan 16, 2026
  **/
 
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <string>

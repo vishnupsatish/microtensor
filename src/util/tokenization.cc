@@ -5,11 +5,13 @@
 
 #include "tokenization.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <limits>
 #include <list>
 #include <map>
+#include <optional>
 #include <set>
 #include <unordered_set>
 

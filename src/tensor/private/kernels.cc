@@ -44,9 +44,10 @@ void matmulKernel(float* ptr_c, const float* ptr_a, const float* ptr_b,
 
 // Kernel that assumes last two dimensions of c and a are contiguous in memory
 // and the last two dimensions of the transpose of b is contiguous in memory.
-inline void matmulContiguousKernel(float* ptr_c, const float* ptr_a,
-                                   const float* ptr_b, size_t m, size_t k,
-                                   size_t n) {
+inline void matmulAContBTransposeContKernel(float* __restrict ptr_c,
+                                            const float* __restrict ptr_a,
+                                            const float* __restrict ptr_b,
+                                            size_t m, size_t k, size_t n) {
 // `a` is m * k, `b` is k * n.
 #pragma omp parallel for collapse(2)
   for (size_t i = 0; i < m; ++i) {
@@ -60,20 +61,41 @@ inline void matmulContiguousKernel(float* ptr_c, const float* ptr_a,
   }
 }
 
-inline void matmulTiledContiguousKernel(float* ptr_c, const float* ptr_a,
-                                        const float* ptr_b, size_t m, size_t k,
-                                        size_t n) {
-  // `a` is m * k, `b` is k * n.
-  const int tileSize = 32;
+inline void matmulAContBContKernel(float* __restrict ptr_c,
+                                   const float* __restrict ptr_a,
+                                   const float* __restrict ptr_b, size_t m,
+                                   size_t k, size_t n) {
+// `a` is m * k, `b` is k * n.
+#pragma omp parallel for collapse(2)
+  for (size_t i = 0; i < m; ++i) {
+    for (size_t p = 0; p < k; ++p) {
+      float valA = ptr_a[i * k + p];
+#pragma omp simd
+      for (size_t j = 0; j < n; ++j) {
+        ptr_c[i * n + j] += valA * ptr_b[p * n + j];
+      }
+    }
+  }
+}
 
-  for (size_t cr0 = 0; cr0 < m; cr0 += tileSize) {
-    size_t crEnd = std::min(cr0 + tileSize, m);
-    for (size_t cc0 = 0; cc0 < n; cc0 += tileSize) {
-      size_t ccEnd = std::min(cc0 + tileSize, n);
+void matmulAContBTransposeContTiledKernel(float* __restrict ptr_c,
+                                          const float* __restrict ptr_a,
+                                          const float* __restrict ptr_b,
+                                          size_t m, size_t k, size_t n) {
+  // `a` is m * k, `b` is k * n.
+  const int tileM = 32;
+  const int tileK = 32;
+  const int tileN = 32;
+
+#pragma omp parallel for collapse(2)
+  for (size_t cr0 = 0; cr0 < m; cr0 += tileM) {
+    size_t crEnd = std::min(cr0 + tileM, m);
+    for (size_t cc0 = 0; cc0 < n; cc0 += tileN) {
+      size_t ccEnd = std::min(cc0 + tileN, n);
       // cr, cc defines a tile in the output. Now, we loop all rows in a,
       // columns in b that define the values in this tile.
-      for (size_t p0 = 0; p0 < k; p0 += tileSize) {
-        size_t pEnd = std::min(p0 + tileSize, k);
+      for (size_t p0 = 0; p0 < k; p0 += tileK) {
+        size_t pEnd = std::min(p0 + tileK, k);
 
         for (size_t i = cr0; i < crEnd; ++i) {
           for (size_t j = cc0; j < ccEnd; ++j) {
@@ -87,62 +109,36 @@ inline void matmulTiledContiguousKernel(float* ptr_c, const float* ptr_a,
   }
 }
 
-void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
-                   std::shared_ptr<TensorImpl> b) {
-  size_t rank = c->getRank();
+void matmulAContBContTiledKernel(float* __restrict ptr_c,
+                                 const float* __restrict ptr_a,
+                                 const float* __restrict ptr_b, size_t m,
+                                 size_t k, size_t n) {
+  // `a` is m * k, `b` is k * n.
+  const int tileM = 64;
+  const int tileK = 64;
+  const int tileN = 64;
 
-  size_t batch_rank = rank - 2;
-  size_t m = c->m_shape[rank - 2];
-  size_t n = c->m_shape[rank - 1];
+#pragma omp parallel for collapse(2)
+  for (size_t cr0 = 0; cr0 < m; cr0 += tileM) {
+    for (size_t cc0 = 0; cc0 < n; cc0 += tileN) {
+      size_t crEnd = std::min(cr0 + tileM, m);
+      size_t ccEnd = std::min(cc0 + tileN, n);
+      // cr, cc defines a tile in the output. Now, we loop all rows in a,
+      // columns in b that define the values in this tile.
+      for (size_t p0 = 0; p0 < k; p0 += tileK) {
+        size_t pEnd = std::min(p0 + tileK, k);
 
-  size_t k = a->m_shape[rank - 1];
+        for (size_t i = cr0; i < crEnd; ++i) {
+          for (size_t p = p0; p < pEnd; ++p) {
+            float valA = ptr_a[i * k + p];
 
-  Shape batch_shape(c->m_shape.begin(), c->m_shape.end() - 2);
-
-  size_t total_batches = 1;
-  for (size_t i = 0; i < batch_rank; ++i) total_batches *= batch_shape[i];
-
-  // TODO: I should create a separate transpose function.
-  std::vector<size_t> transpose;
-  for (size_t i = 0; i < batch_rank; ++i) {
-    transpose.push_back(i);
-  }
-  transpose.push_back(batch_rank + 1);
-  transpose.push_back(batch_rank);
-
-  std::shared_ptr<TensorImpl> newA, newB;
-  {
-    NoGrad guard;
-    newA = makeContiguous(a);
-    newB = permute(makeContiguous(permute(b, transpose)), transpose);
-  }
-
-  // This can actually call `matmulContiguousBatched` now.
-
-// Each batch in a matmul is completely separate. Therefore, it can safely
-// be parallelized.
-#pragma omp parallel
-  {
-    std::vector<size_t> current_coords(batch_rank, 0);
-#pragma omp for
-    for (size_t batch = 0; batch < total_batches; ++batch) {
-      getCoordsFromIndex(batch, batch_shape, current_coords);
-
-      size_t offset_a = newA->m_offset;
-      size_t offset_b = newB->m_offset;
-      size_t offset_c = c->m_offset;
-
-      // Use the current coordinates to find the start of the data
-      for (size_t i = 0; i < batch_rank; ++i) {
-        offset_a += current_coords[i] * newA->m_strides[i];
-        offset_b += current_coords[i] * newB->m_strides[i];
-        offset_c += current_coords[i] * c->m_strides[i];
+#pragma omp simd
+            for (size_t j = cc0; j < ccEnd; ++j) {
+              ptr_c[i * n + j] += valA * ptr_b[p * n + j];
+            }
+          }
+        }
       }
-
-      float* ptr_a = newA->m_data->data() + offset_a;
-      float* ptr_b = newB->m_data->data() + offset_b;
-      float* ptr_c = c->m_data->data() + offset_c;
-      matmulContiguousKernel(ptr_c, ptr_a, ptr_b, m, k, n);
     }
   }
 }
@@ -186,7 +182,7 @@ void matmulContiguousBatched(std::shared_ptr<TensorImpl> c,
       float* ptr_a = a->m_data->data() + offset_a;
       float* ptr_b = b->m_data->data() + offset_b;
       float* ptr_c = c->m_data->data() + offset_c;
-      matmulTiledContiguousKernel(ptr_c, ptr_a, ptr_b, m, k, n);
+      matmulAContBContTiledKernel(ptr_c, ptr_a, ptr_b, m, k, n);
     }
   }
 }

@@ -18,9 +18,6 @@ template <typename F>
 void elementwiseUnaryKernel(std::shared_ptr<TensorImpl> res,
                             std::shared_ptr<TensorImpl> a, F&& unary_fn);
 
-void matmulBatched(std::shared_ptr<TensorImpl> c, std::shared_ptr<TensorImpl> a,
-                   std::shared_ptr<TensorImpl> b);
-
 // Assumes last two dimensions of c, a are contiguous in memory and the last two
 // dimensions of the tranpose of b are contiguous.
 void matmulContiguousBatched(std::shared_ptr<TensorImpl> c,
