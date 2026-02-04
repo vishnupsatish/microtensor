@@ -10,7 +10,9 @@
 
 #include "tensor.h"
 
+enum class Mode { Train, Eval };
 class Module {
+  Mode m_mode;
   // Invariant: every module is responsible for managing its own submodules (the
   // simplest way are members that are unique_ptrs).
   // Note: this can go wrong easily. Since m_subModules stores direct pointers
@@ -39,4 +41,7 @@ class Module {
   // Note the lack of a `forward` method. This is due to the variadic nature of
   // inputs/outputs. This means that polymorphic usage of Module (i.e., using
   // Module* or Module&) will not work.
+
+  void setMode(Mode mode);
+  Mode getMode();
 };

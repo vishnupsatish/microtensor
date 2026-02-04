@@ -12,6 +12,7 @@
 // TODO: hyperparameters should be configurable in a cleaner way.
 class GPT2 : public Module {
   size_t m_maxSequenceLength;
+  int m_vocabSize;
   // Token embeddings
   std::unique_ptr<Embedding> m_token;
   // Positional embeddings
@@ -27,4 +28,6 @@ class GPT2 : public Module {
   // Returns (batch, sequence length, vocab size) corresponding to logits of
   // predicted next token for each token in the sequence.
   Tensor forward(Tensor x);
+
+  int getVocabSize();
 };

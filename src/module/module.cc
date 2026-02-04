@@ -22,3 +22,7 @@ std::vector<Tensor> Module::getParameters() {
   }
   return ret;
 }
+
+void Module::setMode(Mode mode) { m_mode = mode; }
+
+Mode Module::getMode() { return m_mode; }

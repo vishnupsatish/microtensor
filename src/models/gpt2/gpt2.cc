@@ -16,6 +16,7 @@ GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
     // Ugly... need to figure out a better way to take inputs as int to convert
     // to size_t for internal representation.
     : m_maxSequenceLength{static_cast<size_t>(maxSequenceLength)},
+      m_vocabSize{vocabSize},
       m_token{std::make_unique<Embedding>(vocabSize, embeddingSize)},
       m_pos{std::make_unique<Embedding>(maxSequenceLength, embeddingSize)},
       m_ln{std::make_unique<LayerNorm>(
@@ -58,3 +59,5 @@ Tensor GPT2::forward(Tensor x) {
   auto logits = m_revEmb->forward(inp);
   return logits;
 }
+
+int GPT2::getVocabSize() { return m_vocabSize; }

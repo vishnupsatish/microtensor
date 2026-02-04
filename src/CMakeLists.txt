@@ -29,6 +29,3 @@ add_subdirectory(util)
 add_subdirectory(models)
 
 # Copy to the root build directory (hack...)
-configure_file(models/gpt2/text.txt ${CMAKE_BINARY_DIR}/text.txt COPYONLY)
-configure_file(models/gpt2/smallerWikipedia.txt ${CMAKE_BINARY_DIR}/smallerWikipedia.txt COPYONLY)
-configure_file(models/gpt2/pridePrejudice.txt ${CMAKE_BINARY_DIR}/pridePrejudice.txt COPYONLY)
