@@ -16,9 +16,11 @@ SelfAttention::SelfAttention(size_t embeddingSize, size_t numHeads)
     : m_embeddingSize{embeddingSize},
       m_numHeads{numHeads},
       m_proj{std::make_unique<Linear>(m_embeddingSize, 3 * m_embeddingSize)},
-      m_outProj{std::make_unique<Linear>(m_embeddingSize, m_embeddingSize)} {
+      m_outProj{std::make_unique<Linear>(m_embeddingSize, m_embeddingSize)},
+      m_dropout{std::make_unique<Dropout>(0.1)} {
   insertSubModule(m_proj.get());
   insertSubModule(m_outProj.get());
+  insertSubModule(m_dropout.get());
 };
 
 Tensor SelfAttention::forward(Tensor x) {
@@ -69,6 +71,9 @@ Tensor SelfAttention::forward(Tensor x) {
   auto masked = scores.maskedFill(upperTriangularOnes,
                                   -std::numeric_limits<float>::infinity());
   auto prob = masked.softmax(-1);
+
+  prob = m_dropout->forward(prob);
+
   // Value for each token, scaled by its "score" (dot product of q, k vectors
   // for those tokens).
   auto vals = prob.matmul(v);
@@ -85,17 +90,20 @@ TransformerBlock::TransformerBlock(size_t embeddingSize)
       m_ln1{std::make_unique<LayerNorm>(Shape{m_embeddingSize})},
       m_attn{std::make_unique<SelfAttention>(m_embeddingSize)},
       m_ln2{std::make_unique<LayerNorm>(Shape{m_embeddingSize})},
-      m_mlp{std::make_unique<MLP>(m_embeddingSize, 4 * m_embeddingSize)} {
+      m_mlp{std::make_unique<MLP>(m_embeddingSize, 4 * m_embeddingSize)},
+      m_dropout{std::make_unique<Dropout>(0.1)} {
   insertSubModule(m_ln1.get());
   insertSubModule(m_attn.get());
   insertSubModule(m_ln2.get());
   insertSubModule(m_mlp.get());
+  insertSubModule(m_dropout.get());
 }
 
 Tensor TransformerBlock::forward(Tensor x) {
   auto attnInput = m_ln1->forward(x);
-  auto attnResidual = x + m_attn->forward(attnInput);
+  auto attnResidual = x + m_dropout->forward(m_attn->forward(attnInput));
   auto mlpInput = m_ln2->forward(attnResidual);
-  auto mlpResidual = attnResidual + m_mlp->forward(mlpInput);
+  auto mlpResidual =
+      attnResidual + m_dropout->forward(m_mlp->forward(mlpInput));
   return mlpResidual;
 }

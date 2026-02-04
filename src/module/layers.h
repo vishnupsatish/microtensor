@@ -48,3 +48,11 @@ class MLP : public Module {
   MLP(size_t featureSize, size_t projectionSize);
   Tensor forward(Tensor x);
 };
+
+class Dropout : public Module {
+  float m_p;
+
+ public:
+  Dropout(float p);
+  Tensor forward(Tensor x);
+};

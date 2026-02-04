@@ -117,3 +117,17 @@ Tensor MLP::forward(Tensor x) {
   auto l2 = m_linear2->forward(act);
   return l2;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+Dropout::Dropout(float p) : m_p{p} {}
+
+Tensor Dropout::forward(Tensor x) {
+  if (getMode() == Mode::Eval) {
+    return x;
+  }
+  Tensor mask{x.getShape()};
+  std::bernoulli_distribution d(1 - m_p);
+  mask.fillRandom([&d]() { return d(RNG::get()); });
+  return x * mask * (1.0 / (1 - m_p));
+}

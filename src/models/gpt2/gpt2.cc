@@ -5,6 +5,7 @@
 
 #include "gpt2.h"
 
+#include <memory>
 #include <ranges>
 
 #include "layers.h"
@@ -19,6 +20,7 @@ GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
       m_vocabSize{vocabSize},
       m_token{std::make_unique<Embedding>(vocabSize, embeddingSize)},
       m_pos{std::make_unique<Embedding>(maxSequenceLength, embeddingSize)},
+      m_dropout{std::make_unique<Dropout>(0.1)},
       m_ln{std::make_unique<LayerNorm>(
           Shape{static_cast<size_t>(embeddingSize)})},
       m_revEmb{std::make_unique<Linear>(embeddingSize, vocabSize, false)} {
@@ -30,6 +32,7 @@ GPT2::GPT2(int vocabSize, int maxSequenceLength, int embeddingSize)
   }
   insertSubModule(m_token.get());
   insertSubModule(m_pos.get());
+  insertSubModule(m_dropout.get());
   insertSubModule(m_ln.get());
   insertSubModule(m_revEmb.get());
 }
@@ -46,6 +49,7 @@ Tensor GPT2::forward(Tensor x) {
   }
   Tensor posIdx{Shape{x.getShape()[1]}, posInit};
   auto inp = m_token->forward(x) + m_pos->forward(posIdx);
+  inp = m_dropout->forward(inp);
   for (int i = 0; i < layers; ++i) {
     inp = m_transformers[i]->forward(inp);
   }

@@ -12,7 +12,7 @@
 
 enum class Mode { Train, Eval };
 class Module {
-  Mode m_mode;
+  Mode m_mode = Mode::Train;
   // Invariant: every module is responsible for managing its own submodules (the
   // simplest way are members that are unique_ptrs).
   // Note: this can go wrong easily. Since m_subModules stores direct pointers

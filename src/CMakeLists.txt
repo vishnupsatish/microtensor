@@ -29,3 +29,5 @@ add_subdirectory(util)
 add_subdirectory(models)
 
 # Copy to the root build directory (hack...)
+configure_file(models/gpt2/train.txt ${CMAKE_BINARY_DIR}/train.txt COPYONLY)
+configure_file(models/gpt2/validation.txt ${CMAKE_BINARY_DIR}/validation.txt COPYONLY)

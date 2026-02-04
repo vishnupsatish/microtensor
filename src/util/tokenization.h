@@ -10,9 +10,9 @@
 #include <string>
 #include <vector>
 
-// Want to work with unsigned, since tokens should ideally start from 0 and
-// not -128. Char can be signed in certain architectures/compilers, so we cast
-// char -> uint8_t.
+// Work with unsigned, since tokens should ideally start from 0 and not -128.
+// Char can be signed in certain architectures/compilers, so we cast char ->
+// uint8_t.
 using ByteSequence = std::vector<uint8_t>;
 
 // Indicates merge boundaries.

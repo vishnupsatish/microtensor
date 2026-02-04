@@ -17,6 +17,7 @@ class GPT2 : public Module {
   std::unique_ptr<Embedding> m_token;
   // Positional embeddings
   std::unique_ptr<Embedding> m_pos;
+  std::unique_ptr<Dropout> m_dropout;
   std::vector<std::unique_ptr<TransformerBlock>> m_transformers;
   std::unique_ptr<LayerNorm> m_ln;
 

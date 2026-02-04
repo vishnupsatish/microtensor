@@ -17,9 +17,10 @@ class SelfAttention : public Module {
   // The projection to Q, K, V (in that order).
   std::unique_ptr<Linear> m_proj;
   std::unique_ptr<Linear> m_outProj;
+  std::unique_ptr<Dropout> m_dropout;
 
  public:
-  SelfAttention(size_t embeddingSize, size_t numHeads = 6);
+  SelfAttention(size_t embeddingSize, size_t numHeads = 4);
   Tensor forward(Tensor x);
 };
 
@@ -29,6 +30,7 @@ class TransformerBlock : public Module {
   std::unique_ptr<SelfAttention> m_attn;
   std::unique_ptr<LayerNorm> m_ln2;
   std::unique_ptr<MLP> m_mlp;
+  std::unique_ptr<Dropout> m_dropout;
 
  public:
   TransformerBlock(size_t embeddingSize);
