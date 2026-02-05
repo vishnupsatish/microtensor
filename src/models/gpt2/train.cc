@@ -37,7 +37,7 @@ void signalHandler(int signum) {
 }
 
 const int maxSequenceLength = 256;
-const int embeddingSize = 192;
+const int embeddingSize = 256;
 const int vocabSize = 4096;
 
 const int batchesForOptimizerUpdate = 32;
@@ -57,8 +57,19 @@ int main() {
   Text valByteSeq = getPretokenizedBytes(valData);
   std::vector<int> tokenizedVal = tokenizeBPE(bpe, valByteSeq);
 
+  std::cout << "Training set: " << tokenizedTrain.size() << " tokens\n";
+  std::cout << "Validation set: " << tokenizedVal.size() << " tokens\n";
+
   GPT2 model{vocabSize, maxSequenceLength, embeddingSize};
   model.setMode(Mode::Train);
+
+  auto params = model.getParameters();
+  size_t totalParams = 0;
+  for (const auto& p : params) {
+    totalParams += sizeFromShape(p.getShape());
+  }
+  std::cout << "Model has " << totalParams << " parameters\n";
+
   auto opt = AdamW{model.getParameters(), 3e-4f, 0.9, 0.999, 1e-8f, 0.01};
 
   std::cout << "Training...\n";
@@ -100,7 +111,7 @@ int main() {
     std::cout << "  Global step took " << elapsed_time_ms
               << " milliseconds\n\n";
 
-    if (epoch % 250 == 0) {
+    if (epoch % 100 == 0) {
       NoGrad guard;
       model.setMode(Mode::Eval);
       std::cout << "Running model on validation data set...\n";

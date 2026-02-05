@@ -15,6 +15,15 @@ void elementwiseBinaryKernel(std::shared_ptr<TensorImpl> res,
   assert(res->m_shape == a->m_shape && res->m_shape == b->m_shape);
   size_t total_elements = sizeFromShape(a->m_shape);
 
+  if (a->isContiguous() && b->isContiguous()) {
+#pragma omp parallel for
+    for (size_t i = 0; i < total_elements; ++i) {
+      (*res->m_data)[i] = binary_fn((*a->m_data)[i + a->m_offset],
+                                    (*b->m_data)[i + b->m_offset]);
+    }
+    return;
+  }
+
 #pragma omp parallel
   {
     std::vector<size_t> coords(a->m_shape.size());
@@ -36,6 +45,14 @@ void elementwiseUnaryKernel(std::shared_ptr<TensorImpl> res,
                             std::shared_ptr<TensorImpl> a, F&& unary_fn) {
   assert(res->m_shape == a->m_shape);
   size_t total_elements = sizeFromShape(a->m_shape);
+
+  if (a->isContiguous()) {
+#pragma omp parallel for
+    for (size_t i = 0; i < total_elements; ++i) {
+      (*res->m_data)[i] = unary_fn((*a->m_data)[i + a->m_offset]);
+    }
+    return;
+  }
 
 #pragma omp parallel for
   for (size_t i = 0; i < total_elements; ++i) {
