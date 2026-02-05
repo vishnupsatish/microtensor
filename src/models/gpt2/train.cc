@@ -40,8 +40,8 @@ const int maxSequenceLength = 256;
 const int embeddingSize = 256;
 const int vocabSize = 4096;
 
-const int batchesForOptimizerUpdate = 32;
-const int parallelBatches = 16;
+const int batchesForOptimizerUpdate = 48;
+const int parallelBatches = 24;
 
 int main() {
   std::signal(SIGINT, signalHandler);
@@ -70,7 +70,7 @@ int main() {
   }
   std::cout << "Model has " << totalParams << " parameters\n";
 
-  auto opt = AdamW{model.getParameters(), 3e-4f, 0.9, 0.999, 1e-8f, 0.01};
+  auto opt = AdamW{model.getParameters(), 1e-3f, 0.9, 0.999, 1e-8f, 0.01};
 
   std::cout << "Training...\n";
   assert(batchesForOptimizerUpdate % parallelBatches == 0);
