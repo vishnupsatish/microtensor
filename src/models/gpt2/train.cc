@@ -146,7 +146,7 @@ int main() {
       }
       auto logitsVec = getNextTokenLogits(context, model);
 
-      int nextTokenId = sampleTopP(40, logitsVec, RNG::get());
+      int nextTokenId = sampleTopP(0.5, logitsVec, RNG::get());
 
       ByteSequence byteSeq = bpe.vocab[nextTokenId];
       std::string outputStr = createStringFromByteSequence(byteSeq);
