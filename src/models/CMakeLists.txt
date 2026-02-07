@@ -7,6 +7,3 @@ target_include_directories(GPT2Lib PUBLIC gpt2)
 
 add_executable(gpt2_train gpt2/train.cc)
 target_link_libraries(gpt2_train GPT2Lib Tensor Module util)
-
-add_executable(gpt2_inference gpt2/inference.cc)
-target_link_libraries(gpt2_inference GPT2Lib Tensor Module util)

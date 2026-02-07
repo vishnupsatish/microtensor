@@ -20,9 +20,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -flto")
 endif()
 
-add_executable(Main main.cc)
-target_link_libraries(Main Tensor Module util)
-
 add_subdirectory(tensor)
 add_subdirectory(module)
 add_subdirectory(util)
